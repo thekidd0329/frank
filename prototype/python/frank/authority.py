@@ -13,16 +13,41 @@ class AuthorityDecision:
 
 
 class AuthorityFirewall:
-    """Policy boundary only. It does not participate in Frank's reasoning loop."""
+    """
+    Policy boundary outside cognition.
 
-    def __init__(self, confirm_all_external: bool = True):
-        self.confirm_all_external = confirm_all_external
+    Read-only/internal work is always allowed. External actions inside granted
+    scope auto-execute at or above the calibrated confidence threshold; below it
+    they require owner confirmation.
+    """
 
-    def evaluate(self, action: ActionCandidate) -> AuthorityDecision:
+    def __init__(self, auto_execute_threshold: float = 0.90):
+        if not 0.0 <= auto_execute_threshold <= 1.0:
+            raise ValueError("auto_execute_threshold must be between 0 and 1")
+        self.auto_execute_threshold = auto_execute_threshold
+
+    def evaluate(
+        self,
+        action: ActionCandidate,
+        calibrated_confidence: float = 0.0,
+        scope_permitted: bool = True,
+    ) -> AuthorityDecision:
         if action.side_effect is SideEffect.NONE:
             return AuthorityDecision(True, False, "read-only/internal action")
 
-        if self.confirm_all_external:
-            return AuthorityDecision(False, True, "external side effect requires owner confirmation")
+        if not scope_permitted:
+            return AuthorityDecision(False, False, "action is outside granted authority scope")
 
-        return AuthorityDecision(True, False, "policy permits autonomous execution")
+        confidence = max(0.0, min(1.0, calibrated_confidence))
+        if confidence >= self.auto_execute_threshold:
+            return AuthorityDecision(
+                True,
+                False,
+                f"calibrated confidence {confidence:.2f} meets auto-execute threshold",
+            )
+
+        return AuthorityDecision(
+            False,
+            True,
+            f"calibrated confidence {confidence:.2f} below auto-execute threshold",
+        )
