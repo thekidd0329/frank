@@ -1,0 +1,16 @@
+[package]
+name = "frank-android-compat"
+version = "0.1.0"
+edition = "2021"
+description = "Reference control plane for Frank's Android-compatible operating-system architecture"
+license = "Apache-2.0"
+
+[lib]
+name = "frank_android_compat"
+path = "src/lib.rs"
+
+[[bin]]
+name = "frankd"
+path = "src/bin/frankd.rs"
+
+[dependencies]
