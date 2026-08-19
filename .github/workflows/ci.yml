@@ -2,7 +2,7 @@ name: Frank Core CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, ANdroid-Compatibility]
   pull_request:
   workflow_dispatch:
 
@@ -32,3 +32,9 @@ jobs:
 
       - name: Run core and prototype tests
         run: ./test.sh
+
+      - name: Run Android compatibility control-plane tests
+        run: cargo test --manifest-path platform/android-compat/Cargo.toml
+
+      - name: Run frankd reference daemon
+        run: cargo run --manifest-path platform/android-compat/Cargo.toml --bin frankd
