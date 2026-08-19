@@ -9,7 +9,7 @@ package frank.cognition
 object ExampleUsage {
     @JvmStatic
     fun main(args: Array<String>) {
-        val engine = ReasoningEngine()
+        val engine = ReasoningEngine.developmental()
 
         // Simulate incoming evidence from the existing compact-claim / ontology world
         val bridge = EvidenceToCommitment()

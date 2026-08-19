@@ -9,73 +9,45 @@ package frank.cognition
  *
  * Memory is not what happened.
  * Memory is the residual force that what happened left behind.
- *
- * This is the Kotlin-side semantic model. The eventual Rust frank.cog store
- * will pack an equivalent tuple into a fixed-width binary record (Candidate A: 128 bits).
- * Rust object representation ≠ Frank persistent representation.
  */
 data class ResidualCommitment(
-    /** Address in cognitive space. Similar meanings should land near each other. */
     val locus: Locus,
-
-    /** Direction of the preference. */
     val polarity: Polarity,
-
-    /**
-     * How much residual predictive force this commitment still carries.
-     * Range is intentionally [0.0, 1.0] for the Kotlin model.
-     * Binary packing will quantize (e.g. 8-bit).
-     */
     val residualForce: Float,
-
-    /**
-     * How tightly this commitment is bound to a particular context / frame.
-     * High binding → only active in narrow situations.
-     * Low binding → more globally available.
-     */
     val contextualBinding: Float,
-
-    /**
-     * Temporal persistence / generation marker.
-     * Used for decay, recency, and crash-safe generation protocols later.
-     */
     val temporalPersistence: TemporalAnchor,
 
     /**
-     * Optional, expensive. Null by default.
-     * Only allocated when the cost is justified (high-stakes, explicit learning, etc.).
+     * Physical consolidation state carried by the commitment itself.
+     * This replaces hidden external "survived N passes" counters.
+     * Independent completed sleep episodes can progressively mature a stable
+     * commitment until it becomes eligible to function as a settled belief.
      */
-    val provenance: ProvenanceHandle? = null,
+    val consolidationMaturity: Float = 0.0f,
 
-    /** Structural flags that are truly universal across all commitments. */
+    val provenance: ProvenanceHandle? = null,
     val flags: CommitmentFlags = CommitmentFlags.NONE
 ) {
     init {
         require(residualForce in 0.0f..1.0f) { "residualForce must be in [0,1]" }
         require(contextualBinding in 0.0f..1.0f) { "contextualBinding must be in [0,1]" }
+        require(consolidationMaturity in 0.0f..1.0f) { "consolidationMaturity must be in [0,1]" }
     }
 
-    /** True when this commitment still carries usable force. */
     fun isLive(threshold: Float = 0.05f): Boolean = residualForce >= threshold
 
-    /** Decayed copy (pure). Does not mutate. */
     fun decayed(factor: Float): ResidualCommitment {
         require(factor in 0.0f..1.0f)
         return copy(residualForce = (residualForce * factor).coerceIn(0.0f, 1.0f))
     }
 
-    /** Reinforced copy (pure). */
-    fun reinforced(delta: Float): ResidualCommitment {
-        return copy(residualForce = (residualForce + delta).coerceIn(0.0f, 1.0f))
-    }
+    fun reinforced(delta: Float): ResidualCommitment =
+        copy(residualForce = (residualForce + delta).coerceIn(0.0f, 1.0f))
+
+    fun consolidated(delta: Float = 1.0f / 3.0f): ResidualCommitment =
+        copy(consolidationMaturity = (consolidationMaturity + delta).coerceIn(0.0f, 1.0f))
 }
 
-/**
- * Locus — a stable address in cognitive space.
- * Opaque by design so the addressing scheme can evolve
- * (hash, hierarchical path, learned embedding index, etc.)
- * without rewriting the commitment atom.
- */
 @JvmInline
 value class Locus(val raw: Long) {
     companion object {
@@ -84,34 +56,25 @@ value class Locus(val raw: Long) {
     }
 }
 
+/**
+ * Kotlin keeps an explicit semantic enum for readability.
+ * The future packed binary representation can use one sign bit for positive/negative;
+ * a zero residualForce represents neutral / no surviving directional commitment.
+ */
 enum class Polarity {
     POSITIVE,
     NEGATIVE,
-    /** Explicit absence / contrast without strong directional force. */
     NEUTRAL
 }
 
-/**
- * Temporal anchor kept deliberately small.
- * Full wall-clock timestamps live in secondary indices when needed.
- */
 data class TemporalAnchor(
-    /** Generation or logical clock tick when this commitment was last reinforced. */
     val generation: Long,
-    /** Coarse recency bucket or delta from a known epoch (packing-friendly). */
     val recencyDelta: Int = 0
 )
 
-/**
- * Cheap optional handle. The real provenance payload lives elsewhere
- * (or will live in a secondary arena in the binary store).
- */
 @JvmInline
 value class ProvenanceHandle(val id: Long)
 
-/**
- * Bit-friendly flags. Keep the set tiny and universal.
- */
 @JvmInline
 value class CommitmentFlags(val bits: Int) {
     companion object {
@@ -121,9 +84,14 @@ value class CommitmentFlags(val bits: Int) {
         val INFERRED = CommitmentFlags(1 shl 2)
         val CONTESTED = CommitmentFlags(1 shl 3)
         val HIGH_STAKES = CommitmentFlags(1 shl 4)
+        val FOUNDATIONAL = CommitmentFlags(1 shl 5)
+        val SLOW_DECAY = CommitmentFlags(1 shl 6)
+        val IDENTITY = CommitmentFlags(1 shl 7)
+        val HOMEOSTATIC = CommitmentFlags(1 shl 8)
     }
 
     fun has(flag: CommitmentFlags): Boolean = (bits and flag.bits) != 0
     fun with(flag: CommitmentFlags): CommitmentFlags = CommitmentFlags(bits or flag.bits)
     fun without(flag: CommitmentFlags): CommitmentFlags = CommitmentFlags(bits and flag.bits.inv())
+    fun merged(other: CommitmentFlags): CommitmentFlags = CommitmentFlags(bits or other.bits)
 }
