@@ -1,0 +1,9 @@
+service frankd /system/bin/frankd
+    class core
+    user system
+    group system inet
+    disabled
+    oneshot
+
+on post-fs-data
+    start frankd
