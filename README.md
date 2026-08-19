@@ -1,3 +1,7 @@
+> **Frank’s memory is not what happened. Frank’s memory is the residual force that what happened left behind.**
+>
+> **Ground-layer invariant:** the persistent source of truth is the **Residual Commitment Field**. A residual commitment is the complete compact tuple — locus + polarity + residual force + contextual binding + temporal persistence + optional provenance. Entities, relations, beliefs, goals, episodes, and even the self-model are reconstructable projections or discardable secondary indices over that field, never the ground truth.
+
 FRANK IS BEING DEVELOPED TO BE A FULLY CAPABLE FRONT END, RIGOROUS ASSISTANT- NATIVE TO KOTLIN. (F.R.A.N.K.)
 
 THIS IS ENTIRELY ORCHESTRATED AND THE SOLE VISION OF THE OWNER, MYSELF. HOWEVER- I MUST GIVE CREDIT TO MY beautiful MULTI-LLM ADVERSARIAL ENGINEERING GAUNTLET.
