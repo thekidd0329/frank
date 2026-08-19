@@ -6,166 +6,188 @@
 
 Frank's persistent cognitive source of truth is a **Residual Commitment Field**.
 
-A **Residual Commitment** is the entire compact tuple, not merely a scalar weight:
+A durable **Residual Commitment** now has exactly three semantic variables:
 
-- **locus** — where in cognitive possibility space the commitment applies
-- **polarity + residual force** — represented together as a graded signed force
-- **contextual binding** — how tightly that bias is bound to a particular context
-- **temporal persistence** — how the commitment survives, decays, or remains available through time
-- **universal structural state** — only those tiny distinctions that prove valid across cognition
-- **optional provenance** — an expensive link allocated only when later explanation/audit is worth the storage cost
+```text
+locus_id          // WHERE the force lives
+net_force         // DIRECTION + STRENGTH, signed
+last_updated_tick // WHEN it was last materially maintained
+```
 
-The proposition is **not** the ground record. A proposition is a projection of one or more commitments.
+Everything else must prove that it deserves ground-state storage.
 
-Entities, relations, beliefs, goals, episodes, temporal chains, activation maps, and even the self-model are therefore:
-
-1. materialized views over the commitment field,
-2. secondary indices over the field, or
-3. working-memory structures derived from the field.
-
-They may be persisted as caches for speed, but they must remain **discardable and reconstructable**. They are never authoritative source-of-truth state.
+The proposition is **not** the ground record. Entities, relations, beliefs, goals, episodes, temporal chains, activation maps, and self-model views are projections, secondary indices, or working structures over the commitment field. They may be cached, but those caches remain discardable and reconstructable.
 
 ## Hard reconstruction invariant
 
-> **If only the Residual Commitment Field survives, Frank must be able to reconstruct a coherent self.**
+> **If only the Residual Commitment Field survives, Frank must be able to reconstruct a coherent cognitive state.**
 
-Any persistent cache whose loss makes this impossible has accidentally become ground truth and violates the architecture.
+Any supposedly secondary structure whose loss makes continuation impossible has accidentally become ground truth and violates the architecture.
 
-## Provenance rule
+## Locus
 
-Provenance is intentionally optional and comparatively expensive.
+**Locus is the address of a commitment inside Frank's cognitive space.**
 
-The default commitment record must not pay a full pointer cost for provenance. High-stakes commitments, explicit learning events, contested commitments, or commitments that require later audit/explanation may allocate an auxiliary provenance entry. Ordinary low-value commitments should remain completely inline.
+It answers:
 
-## Why the inversion matters
+> Where does this residual force live?
 
-Conventional packed cognition still tends to begin with something equivalent to:
+A locus has two jobs:
+
+1. **Identity** — the same learned meaning should retain the same address across time.
+2. **Topology** — related meanings should be local enough that activation, scanning, association, and decay policy can exploit neighborhood structure.
+
+Most of the system should treat a locus as opaque. Only locus construction, addressing, and the commitment field should care how its bits acquire structure.
+
+The address assignment procedure must not smuggle in a propositional ontology. If a new meaning can only receive a good locus by looking up a human- or model-defined concept first, the inversion has failed.
+
+The exact novel-locus construction algorithm remains an open research problem.
+
+## Signed force
+
+`net_force` carries both polarity and magnitude.
 
 ```text
-subject -> relation -> object -> confidence -> flags -> time
+negative  -> push / opposing direction
+zero      -> equilibrium / no durable directional commitment
+positive  -> pull / supporting direction
 ```
 
-That representation assumes the proposition is primary and persistence/activation is metadata.
+A separate polarity field is redundant.
 
-Residual-commitment architecture reverses this:
+Reinforcement and contradiction are signed pressure on the same variable. A simple experimental update is:
 
 ```text
-persistent local cognitive bias
-        ↓
-projection / interpretation
-        ↓
-entity, relation, belief, goal, episode, self-model ...
+F_decayed = F_prior * retention(locus) ^ delta_ticks
+F_new     = clamp(F_decayed + evidence_force, -1.0, +1.0)
 ```
 
-Contradiction is therefore not necessarily a database conflict. Opposed live commitments may coexist at overlapping loci. The tension itself can be cognitively meaningful and context can determine which force dominates at a given moment.
+This is an experimental mechanics rule, not yet a frozen cognitive law.
 
-Forgetting is likewise not deletion of a proposition. It can be reduction of residual force, weakening of contextual binding, altered temporal persistence, or replacement by stronger local commitments.
+## Sparse tree rule
 
-## Candidate A: 128-bit experimental atom
+The Residual Commitment Field does **not** preallocate empty meanings.
 
-**This layout is explicitly experimental and is NOT an on-disk format commitment yet.**
+Absence of a locus means no lasting commitment currently exists there.
 
-The first pressure-test uses 128 bits because 64 bits appears too restrictive if the atom must remain independently reversible, contextual, temporally meaningful, and mostly self-contained.
+Zero is therefore a transition/equilibrium state, not a durable row. If cancellation or decay drives a commitment to the configured prune threshold, the record is removed.
+
+```text
+raw pattern
+    ↓
+temporary pressure
+    ↓
+enough directional force?
+   / \
+ no   yes
+ ↓     ↓
+die   create locus
+         ↓
+      maintain / oppose
+         ↓
+      signed net force
+         ↓
+      unsupported
+         ↓
+      lazy decay
+         ↓
+      near neutral
+         ↓
+        prune
+```
+
+The tree contains only branches that have actually borne enough fruit to persist.
+
+## Structured decay without a bloated atom
+
+Decay does not need per-record `contextual_binding`, `flags`, `persistence_class`, or a stored half-life.
+
+The current simplification is:
+
+```text
+decay behavior = function(locus topology, abs(net_force), age)
+```
+
+The locus can eventually encode or imply the neighborhood/region that governs decay. Force and age provide the other two inputs.
+
+This keeps the atom small while preserving the ability for different cognitive regions to age differently.
+
+The exact locus-topology-to-decay mapping is deliberately **not** frozen yet because defining those regions top-down could accidentally recreate an ontology.
+
+## Candidate A: experimental 128-bit pressure test
+
+**Candidate A is experimental. It is NOT a frozen `frank.cog` ABI.**
+
+The current three-variable pressure-test packing is:
 
 ```text
 128 bits / 16 bytes
 
 word 0
-  locus               48 bits
-  context_tag         16 bits
+  locus_id            64 bits
 
 word 1
-  signed_force         8 bits
-  binding_strength     7 bits
-  generation_anchor   20 bits
-  persistence_class    5 bits
-  kind                 4 bits
-  flags                4 bits
-  provenance_handle   16 bits
+  net_force           32 bits  // IEEE-754 f32 bits
+  last_updated_tick   32 bits  // relative/local logical tick
 ```
 
-Exactly 128 bits.
+This packing has a useful property: every bit currently belongs to one of the three actual semantic variables. There are no speculative `kind`, `flags`, context, or inline-provenance fields consuming space just because bits are available.
 
-### Interpretation
+The 32-bit tick is a pressure-test choice only. Epoch, wrap, and long-horizon requirements must be measured. If those measurements require more temporal width, Candidate A should be changed rather than defended.
 
-- `locus` is a compact address in cognitive space, not an EntityId or proposition hash by definition.
-- `context_tag` is deliberately separate from the locus so context sensitivity is not irreversibly collapsed into addressing.
-- `signed_force` combines polarity and magnitude in one graded field. Candidate A reserves `-128`, leaving a symmetric usable range of `-127..=127`; `0` is neutral/no directional residual force.
-- `binding_strength` is `0..=127` and expresses how tightly context constrains the commitment.
-- `generation_anchor` is a compact 20-bit relative time/generation reference. Its epoch and wrap semantics are image-level concerns, not stored redundantly in each atom.
-- `persistence_class` selects one of at most 32 decay/retention regimes rather than storing a large half-life/timestamp tuple per record.
-- `kind` is four bits reserved only for structural distinctions that prove truly universal. No entity/relation/goal ontology is allowed to leak into it merely because bits are available.
-- `flags` is another four bits of universal state. Their meanings are intentionally unassigned until experiments force them.
-- `provenance_handle == 0` means no provenance. A non-zero 16-bit handle addresses an auxiliary local pool when explanation/audit is worth the cost.
-
-Candidate A therefore keeps the common case at exactly 16 bytes while preserving independent locus, context, force, binding, temporal state, and optional provenance.
-
-The exact widths are subject to destruction by benchmarks. Candidate A exists to give the theory something concrete to attack.
-
-## Pressure tests for the bit layout
-
-A viable atom must pass all of these without secretly moving ground truth into a secondary object graph.
-
-### 1. Reversibility
-
-Pack -> unpack must preserve every primitive exactly.
-
-A symbolic projection may be lossy or inferred; the ground tuple itself may not be.
-
-### 2. Locality
-
-Commitments likely to compete or reinforce each other should be discoverable with bounded local work. If every cognitive update requires a global scan, the locus scheme has failed.
-
-### 3. Contradiction
-
-Two opposed commitments must coexist without one overwriting the other. Querying a context should be capable of yielding tension rather than forcing premature resolution.
-
-### 4. Natural decay
-
-A commitment's effective force should be computable from compact fields and current generation/time without mutating every record on every tick.
-
-### 5. Reinforcement
-
-A new compatible experience should update or add commitment state cheaply without reconstructing a symbolic graph first.
-
-### 6. Context sensitivity
-
-The same apparent symbolic proposition must be able to behave differently under different contexts without cloning a large proposition record.
-
-### 7. Optional provenance
-
-The common case must remain 16 bytes. Attaching provenance must not change the base record width or require every commitment to reserve a full machine pointer.
-
-### 8. Reconstruction
-
-Delete all materialized Entity/Relation/Belief/Goal/Episode/Self indices and reconstruct coherent projections from the commitment field plus the minimal interpretation machinery.
-
-### 9. Neural hand-off
-
-Selecting high-force commitments in relevant loci should produce a compact activation set without first materializing the entire symbolic graph or replaying conversational history.
-
-### 10. Scale
-
-The base arena cost for Candidate A is:
+Base arena density remains:
 
 ```text
 1,000,000 commitments  ~= 15.26 MiB
 10,000,000 commitments ~= 152.59 MiB
 ```
 
-Any required index overhead must be measured separately and treated as a cache cost, not quietly folded into the atom.
+before indexes/caches.
 
-## Things deliberately NOT decided yet
+## What was removed from the ground atom
 
-- whether loci are hashes, learned addresses, hyperdimensional coordinates, hierarchical addresses, or a hybrid
-- whether signed scalar force ultimately survives or becomes a small directional code
-- the exact decay equation / persistence classes
-- whether context belongs partly in the locus in addition to the explicit tag
-- how provenance handles are segmented beyond 65,535 local entries
-- whether 96 bits is a superior eventual packing target after measurements
-- whether multiple commitments at the same locus are stored adjacently, bucketed, or indexed separately
-- meanings for `kind` and `flags`
-- how symbolic projections learn their interpretation rules
-- how the neural substrate writes candidate commitments without corrupting locality
+The earlier fuller tuple included:
 
-Those are research questions. Freezing them before benchmarks would recreate the exact ontology-first mistake this architecture is trying to avoid.
+- separate polarity
+- contextual binding
+- persistence class / temporal tuple
+- universal `kind`
+- flags
+- inline optional provenance handle
+
+Those are no longer assumed to belong in every commitment.
+
+Current rule:
+
+> **Everything has to earn its bit.**
+
+If later experiments prove some distinction is required for reconstruction and cannot be derived from locus, force, time, or a reconstructable auxiliary structure, then it can return to the ground schema with evidence.
+
+## `frank.cog` arena authority
+
+The **Residual Commitment arena is authoritative ground state**.
+
+Entity, Relation, Episode, Goal, Belief, Activation, TemporalIndex and similar arenas may still exist as persistent caches or compatibility views for speed. Their arena IDs are retained so the schema can evolve without gratuitously invalidating older branch images, but they are not independent cognitive truth.
+
+Provenance and string pools may preserve auxiliary evidence/explanation material when justified, but must not silently become required hidden cognitive state unless the reconstruction boundary is explicitly revised.
+
+## Current open research question
+
+> **How do we construct a stable, locality-preserving locus for a meaning Frank has never encountered before, without an ontology secretly choosing the meaning for him?**
+
+Viable directions under investigation include:
+
+- content-derived locality-preserving projection/hash;
+- online topological allocation near active/similar commitments;
+- hyperdimensional/vector-symbolic addressing;
+- a tiny non-propositional bootstrap orientation.
+
+None is settled.
+
+## Credits
+
+- **Christian / Thekidd0329** — project owner and architecture controller; defined locus as the address where residual force is parked, drove the three-variable atom, the sparse fruit-bearing-tree rule, and the decision to let topology govern decay rather than bloating every record.
+- **Grok** — introduced/pushed the Residual Commitment inversion that moved persistence away from proposition-first memory.
+- **Gemini** — adversarially pressure-tested the atom, locus construction, decay, reconstruction, and ontology-contamination risks that led directly to this simplification pass.
+- **ChatGPT** — systems integration: reconciled the relay outputs with repository contracts and translated the current decision into code/docs/schema changes.
+- **Claude / Copilot and the wider gauntlet** — structural simulation and implementation-hole stages remain downstream checks before this experiment should be treated as settled.

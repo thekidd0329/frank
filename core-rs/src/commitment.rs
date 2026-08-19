@@ -1,166 +1,179 @@
-//! Experimental residual-commitment atom.
+//! Experimental three-variable residual-commitment atom.
 //!
 //! IMPORTANT: this is NOT yet part of the stable `frank.cog` ABI.
-//! It is a pressure-test candidate for the ground cognitive primitive.
+//! Candidate A exists to pressure-test the smallest ground record that still
+//! preserves Frank's reconstruction invariant.
 //!
-//! Ground-layer rule:
-//! a residual commitment is the complete tuple, not merely a weight.
-//! The tuple remains independently inspectable and reversible.
+//! The ground atom has exactly three semantic variables:
 //!
-//! Candidate A packs exactly 128 bits / 16 bytes:
+//! 1. `locus_id`          — WHERE the residual force lives.
+//! 2. `net_force`         — DIRECTION + STRENGTH, signed in [-1.0, 1.0].
+//! 3. `last_updated_tick` — WHEN the commitment was last materially maintained.
+//!
+//! Zero is meaningful as equilibrium, but it is not durable state. An absent
+//! locus means there is no lasting commitment there. If decay or cancellation
+//! reaches the prune threshold, the record is removed rather than stored as an
+//! empty node.
+//!
+//! Candidate A packs these three variables into exactly 128 bits / 16 bytes:
 //!
 //! word 0 (64 bits)
-//!   locus              48
-//!   context_tag        16
+//!   locus_id            64
 //!
 //! word 1 (64 bits)
-//!   signed_force        8
-//!   binding_strength    7
-//!   generation_anchor  20
-//!   persistence_class   5
-//!   kind                4
-//!   flags               4
-//!   provenance_handle  16
+//!   net_force (f32)     32
+//!   last_updated_tick   32
 //!
-//! `signed_force` combines polarity and residual-force magnitude. Value -128 is
-//! deliberately rejected so the usable range is symmetric: -127..=127.
-//! Zero means no directional residual force.
-//!
-//! `kind` and `flags` are intentionally uninterpreted at this layer. Their
-//! semantic meanings must only be assigned if they prove truly universal.
-//!
-//! `provenance_handle == 0` means no provenance. The common case therefore
-//! remains fully inline and exactly 16 bytes.
+//! The 32-bit tick is an EXPERIMENTAL relative/local clock for Candidate A.
+//! Epoch and wrap semantics remain image-level research questions. If real
+//! measurements prove 32 bits insufficient, Candidate A loses; the architecture
+//! must not fake precision to protect a packing target.
 
 use core::fmt;
 
 pub const COMMITMENT_BYTES: usize = 16;
+pub const MIN_FORCE: f32 = -1.0;
+pub const MAX_FORCE: f32 = 1.0;
 
-pub const LOCUS_BITS: u32 = 48;
-pub const CONTEXT_BITS: u32 = 16;
-pub const FORCE_BITS: u32 = 8;
-pub const BINDING_BITS: u32 = 7;
-pub const GENERATION_BITS: u32 = 20;
-pub const PERSISTENCE_BITS: u32 = 5;
-pub const KIND_BITS: u32 = 4;
-pub const FLAGS_BITS: u32 = 4;
-pub const PROVENANCE_BITS: u32 = 16;
+pub type LocusId = u64;
 
-pub const MAX_LOCUS: u64 = (1u64 << LOCUS_BITS) - 1;
-pub const MAX_BINDING: u8 = (1u8 << BINDING_BITS) - 1;
-pub const MAX_GENERATION_ANCHOR: u32 = (1u32 << GENERATION_BITS) - 1;
-pub const MAX_PERSISTENCE_CLASS: u8 = (1u8 << PERSISTENCE_BITS) - 1;
-pub const MAX_KIND: u8 = (1u8 << KIND_BITS) - 1;
-pub const MAX_FLAGS: u8 = (1u8 << FLAGS_BITS) - 1;
-
-const FORCE_SHIFT: u32 = 0;
-const BINDING_SHIFT: u32 = FORCE_SHIFT + FORCE_BITS;
-const GENERATION_SHIFT: u32 = BINDING_SHIFT + BINDING_BITS;
-const PERSISTENCE_SHIFT: u32 = GENERATION_SHIFT + GENERATION_BITS;
-const KIND_SHIFT: u32 = PERSISTENCE_SHIFT + PERSISTENCE_BITS;
-const FLAGS_SHIFT: u32 = KIND_SHIFT + KIND_BITS;
-const PROVENANCE_SHIFT: u32 = FLAGS_SHIFT + FLAGS_BITS;
-
-const _: () = assert!(PROVENANCE_SHIFT + PROVENANCE_BITS == 64);
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ResidualCommitment {
-    /// Compact address in cognitive space.
-    pub locus: u64,
-    /// Local contextual discriminator. It is deliberately separate from locus.
-    pub context_tag: u16,
-    /// Direction + magnitude of the residual commitment.
-    /// Valid range is -127..=127; -128 is reserved/invalid.
-    pub signed_force: i8,
-    /// Context-binding strength, 0..=127.
-    pub binding_strength: u8,
-    /// Compact relative generation/time anchor, 20 bits.
-    pub generation_anchor: u32,
-    /// Selects one of at most 32 temporal persistence/decay regimes.
-    pub persistence_class: u8,
-    /// Four universal structural bits; ontology-specific meanings do not belong here.
-    pub kind: u8,
-    /// Four universal state bits; meanings remain intentionally unassigned for now.
-    pub flags: u8,
-    /// Zero means absent. Non-zero addresses an optional expensive auxiliary record.
-    pub provenance_handle: u16,
+    /// Stable address in Frank's cognitive space.
+    ///
+    /// Identity: this particular meaning lives here.
+    /// Topology: the address/neighborhood may also determine locality and decay
+    /// behavior once the locus-construction scheme is experimentally settled.
+    pub locus_id: LocusId,
+
+    /// Signed residual force. Sign is polarity; magnitude is strength.
+    /// Valid durable range is [-1.0, 1.0] excluding exactly 0.0.
+    pub net_force: f32,
+
+    /// Relative/local logical tick when this record was last materialized by
+    /// reinforcement, contradiction, or a lazy-decay query.
+    pub last_updated_tick: u32,
 }
 
 impl ResidualCommitment {
+    pub fn new(
+        locus_id: LocusId,
+        net_force: f32,
+        last_updated_tick: u32,
+    ) -> Result<Self, CommitmentError> {
+        let commitment = Self {
+            locus_id,
+            net_force,
+            last_updated_tick,
+        };
+        commitment.validate()?;
+        Ok(commitment)
+    }
+
     pub fn validate(self) -> Result<(), CommitmentError> {
-        if self.locus > MAX_LOCUS {
-            return Err(CommitmentError::LocusOutOfRange(self.locus));
-        }
-        if self.signed_force == i8::MIN {
-            return Err(CommitmentError::ReservedForceValue);
-        }
-        if self.binding_strength > MAX_BINDING {
-            return Err(CommitmentError::BindingOutOfRange(self.binding_strength));
-        }
-        if self.generation_anchor > MAX_GENERATION_ANCHOR {
-            return Err(CommitmentError::GenerationOutOfRange(self.generation_anchor));
-        }
-        if self.persistence_class > MAX_PERSISTENCE_CLASS {
-            return Err(CommitmentError::PersistenceClassOutOfRange(
-                self.persistence_class,
-            ));
-        }
-        if self.kind > MAX_KIND {
-            return Err(CommitmentError::KindOutOfRange(self.kind));
-        }
-        if self.flags > MAX_FLAGS {
-            return Err(CommitmentError::FlagsOutOfRange(self.flags));
+        validate_force(self.net_force)?;
+        if self.net_force == 0.0 {
+            return Err(CommitmentError::ZeroForceIsNotDurable);
         }
         Ok(())
     }
 
-    pub fn pack(self) -> Result<PackedCommitment, CommitmentError> {
-        self.validate()?;
-
-        let word0 = (self.locus & MAX_LOCUS) | ((self.context_tag as u64) << 48);
-
-        let mut word1 = 0u64;
-        word1 |= (self.signed_force as u8 as u64) << FORCE_SHIFT;
-        word1 |= (self.binding_strength as u64) << BINDING_SHIFT;
-        word1 |= (self.generation_anchor as u64) << GENERATION_SHIFT;
-        word1 |= (self.persistence_class as u64) << PERSISTENCE_SHIFT;
-        word1 |= (self.kind as u64) << KIND_SHIFT;
-        word1 |= (self.flags as u64) << FLAGS_SHIFT;
-        word1 |= (self.provenance_handle as u64) << PROVENANCE_SHIFT;
-
-        let mut bytes = [0u8; COMMITMENT_BYTES];
-        bytes[..8].copy_from_slice(&word0.to_le_bytes());
-        bytes[8..].copy_from_slice(&word1.to_le_bytes());
-        Ok(PackedCommitment(bytes))
-    }
-
-    pub fn polarity(self) -> Polarity {
-        match self.signed_force.cmp(&0) {
-            core::cmp::Ordering::Less => Polarity::Negative,
-            core::cmp::Ordering::Equal => Polarity::Neutral,
-            core::cmp::Ordering::Greater => Polarity::Positive,
+    /// Derived polarity code only. It is deliberately not stored as a fourth field.
+    /// Durable commitments therefore return only -1 or +1; 0 is the neutral/pruned state.
+    pub fn direction(self) -> i8 {
+        if self.net_force > 0.0 {
+            1
+        } else if self.net_force < 0.0 {
+            -1
+        } else {
+            0
         }
     }
 
-    pub fn force_magnitude(self) -> u8 {
-        self.signed_force.unsigned_abs()
+    /// Lazily evaluate force at `current_tick` without inventing a global decay scan.
+    ///
+    /// `retention_per_tick` is supplied by the locus topology/region policy. The
+    /// exact mapping from locus bits to neighborhood/decay class is intentionally
+    /// NOT frozen in Candidate A.
+    pub fn effective_force(
+        self,
+        current_tick: u32,
+        retention_per_tick: f32,
+    ) -> Result<f32, CommitmentError> {
+        validate_retention(retention_per_tick)?;
+        if current_tick < self.last_updated_tick {
+            return Err(CommitmentError::TickWentBackward {
+                current: current_tick,
+                last_updated: self.last_updated_tick,
+            });
+        }
+        let delta = current_tick - self.last_updated_tick;
+        Ok(self.net_force * retention_per_tick.powf(delta as f32))
     }
 
-    pub const fn has_provenance(self) -> bool {
-        self.provenance_handle != 0
+    /// Materialize lazy decay at query time.
+    ///
+    /// Returning `None` means the fruit has fallen off the tree: the locus should
+    /// be removed from durable storage rather than persisted with zero force.
+    pub fn materialize_at(
+        self,
+        current_tick: u32,
+        retention_per_tick: f32,
+        prune_threshold: f32,
+    ) -> Result<Option<Self>, CommitmentError> {
+        validate_threshold(prune_threshold)?;
+        let force = self.effective_force(current_tick, retention_per_tick)?;
+        if force.abs() <= prune_threshold {
+            return Ok(None);
+        }
+        Self::new(self.locus_id, force, current_tick).map(Some)
+    }
+
+    /// Apply signed incoming evidence after lazy decay.
+    ///
+    /// Same-sign evidence reinforces. Opposite-sign evidence contradicts. No
+    /// separate polarity or contestation field is required: signed arithmetic
+    /// supplies the push/pull directly.
+    pub fn apply_evidence(
+        self,
+        current_tick: u32,
+        evidence_force: f32,
+        retention_per_tick: f32,
+        prune_threshold: f32,
+    ) -> Result<Option<Self>, CommitmentError> {
+        validate_force(evidence_force)?;
+        validate_threshold(prune_threshold)?;
+
+        if evidence_force == 0.0 {
+            return self.materialize_at(current_tick, retention_per_tick, prune_threshold);
+        }
+
+        let decayed = self.effective_force(current_tick, retention_per_tick)?;
+        let combined = (decayed + evidence_force).clamp(MIN_FORCE, MAX_FORCE);
+
+        if combined.abs() <= prune_threshold {
+            return Ok(None);
+        }
+
+        Self::new(self.locus_id, combined, current_tick).map(Some)
+    }
+
+    /// Candidate A reversible 16-byte packing.
+    pub fn pack(self) -> Result<PackedCommitment, CommitmentError> {
+        self.validate()?;
+
+        let mut bytes = [0u8; COMMITMENT_BYTES];
+        bytes[..8].copy_from_slice(&self.locus_id.to_le_bytes());
+        bytes[8..12].copy_from_slice(&self.net_force.to_bits().to_le_bytes());
+        bytes[12..16].copy_from_slice(&self.last_updated_tick.to_le_bytes());
+        Ok(PackedCommitment(bytes))
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Polarity {
-    Negative,
-    Neutral,
-    Positive,
-}
-
-/// Exact 16-byte reversible representation.
+/// Exact Candidate A 16-byte representation.
 ///
-/// This wrapper exists specifically so callers never depend on Rust struct layout.
+/// This wrapper exists so the on-disk experiment never depends on Rust struct
+/// layout, padding, compiler version, or target ABI.
 #[derive(Clone, Copy, Eq, PartialEq, Hash)]
 #[repr(transparent)]
 pub struct PackedCommitment(pub [u8; COMMITMENT_BYTES]);
@@ -171,25 +184,12 @@ impl PackedCommitment {
     }
 
     pub fn unpack(self) -> Result<ResidualCommitment, CommitmentError> {
-        let word0 = u64::from_le_bytes(self.0[..8].try_into().expect("fixed 8-byte slice"));
-        let word1 = u64::from_le_bytes(self.0[8..].try_into().expect("fixed 8-byte slice"));
+        let locus_id = u64::from_le_bytes(self.0[..8].try_into().expect("fixed 8-byte slice"));
+        let force_bits = u32::from_le_bytes(self.0[8..12].try_into().expect("fixed 4-byte slice"));
+        let last_updated_tick =
+            u32::from_le_bytes(self.0[12..16].try_into().expect("fixed 4-byte slice"));
 
-        let raw_force = ((word1 >> FORCE_SHIFT) & mask(FORCE_BITS)) as u8;
-
-        let result = ResidualCommitment {
-            locus: word0 & MAX_LOCUS,
-            context_tag: (word0 >> 48) as u16,
-            signed_force: raw_force as i8,
-            binding_strength: ((word1 >> BINDING_SHIFT) & mask(BINDING_BITS)) as u8,
-            generation_anchor: ((word1 >> GENERATION_SHIFT) & mask(GENERATION_BITS)) as u32,
-            persistence_class: ((word1 >> PERSISTENCE_SHIFT) & mask(PERSISTENCE_BITS)) as u8,
-            kind: ((word1 >> KIND_SHIFT) & mask(KIND_BITS)) as u8,
-            flags: ((word1 >> FLAGS_SHIFT) & mask(FLAGS_BITS)) as u8,
-            provenance_handle: ((word1 >> PROVENANCE_SHIFT) & mask(PROVENANCE_BITS)) as u16,
-        };
-
-        result.validate()?;
-        Ok(result)
+        ResidualCommitment::new(locus_id, f32::from_bits(force_bits), last_updated_tick)
     }
 }
 
@@ -199,19 +199,34 @@ impl fmt::Debug for PackedCommitment {
     }
 }
 
-const fn mask(bits: u32) -> u64 {
-    (1u64 << bits) - 1
+fn validate_force(force: f32) -> Result<(), CommitmentError> {
+    if !force.is_finite() || !(MIN_FORCE..=MAX_FORCE).contains(&force) {
+        return Err(CommitmentError::ForceOutOfRange);
+    }
+    Ok(())
+}
+
+fn validate_retention(retention: f32) -> Result<(), CommitmentError> {
+    if !retention.is_finite() || !(0.0..=1.0).contains(&retention) {
+        return Err(CommitmentError::RetentionOutOfRange);
+    }
+    Ok(())
+}
+
+fn validate_threshold(threshold: f32) -> Result<(), CommitmentError> {
+    if !threshold.is_finite() || !(0.0..=1.0).contains(&threshold) {
+        return Err(CommitmentError::PruneThresholdOutOfRange);
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CommitmentError {
-    LocusOutOfRange(u64),
-    ReservedForceValue,
-    BindingOutOfRange(u8),
-    GenerationOutOfRange(u32),
-    PersistenceClassOutOfRange(u8),
-    KindOutOfRange(u8),
-    FlagsOutOfRange(u8),
+    ForceOutOfRange,
+    ZeroForceIsNotDurable,
+    RetentionOutOfRange,
+    PruneThresholdOutOfRange,
+    TickWentBackward { current: u32, last_updated: u32 },
 }
 
 impl fmt::Display for CommitmentError {
@@ -226,158 +241,71 @@ impl std::error::Error for CommitmentError {}
 mod tests {
     use super::*;
 
-    fn example() -> ResidualCommitment {
-        ResidualCommitment {
-            locus: 0x00A1_B2C3_D4E5,
-            context_tag: 0xBEEF,
-            signed_force: -93,
-            binding_strength: 101,
-            generation_anchor: 0xA_BCDE,
-            persistence_class: 17,
-            kind: 6,
-            flags: 0b1010,
-            provenance_handle: 0,
-        }
-    }
+    const EPS: f32 = 0.000_001;
 
     #[test]
-    fn packed_atom_is_exactly_16_bytes() {
+    fn candidate_a_is_exactly_128_bits() {
         assert_eq!(core::mem::size_of::<PackedCommitment>(), 16);
     }
 
     #[test]
-    fn candidate_a_uses_exactly_128_bits() {
+    fn pack_unpack_round_trip_preserves_all_three_variables() {
+        let original = ResidualCommitment::new(0xA1, -0.625, 42).unwrap();
+        let unpacked = original.pack().unwrap().unpack().unwrap();
+        assert_eq!(unpacked.locus_id, original.locus_id);
+        assert_eq!(unpacked.net_force.to_bits(), original.net_force.to_bits());
+        assert_eq!(unpacked.last_updated_tick, original.last_updated_tick);
+    }
+
+    #[test]
+    fn polarity_is_derived_from_signed_force() {
+        assert_eq!(ResidualCommitment::new(1, -0.2, 0).unwrap().direction(), -1);
+        assert_eq!(ResidualCommitment::new(1, 0.2, 0).unwrap().direction(), 1);
+    }
+
+    #[test]
+    fn zero_is_transition_state_not_durable_state() {
         assert_eq!(
-            LOCUS_BITS
-                + CONTEXT_BITS
-                + FORCE_BITS
-                + BINDING_BITS
-                + GENERATION_BITS
-                + PERSISTENCE_BITS
-                + KIND_BITS
-                + FLAGS_BITS
-                + PROVENANCE_BITS,
-            128
+            ResidualCommitment::new(1, 0.0, 0),
+            Err(CommitmentError::ZeroForceIsNotDurable)
         );
     }
 
     #[test]
-    fn pack_unpack_round_trip_is_exact() {
-        let original = example();
-        let unpacked = original.pack().unwrap().unpack().unwrap();
-        assert_eq!(unpacked, original);
+    fn lazy_decay_does_not_invert_direction() {
+        let c = ResidualCommitment::new(0xA1, 0.40, 1).unwrap();
+        let force = c.effective_force(4, 0.90).unwrap();
+        assert!((force - 0.2916).abs() < EPS);
+        assert!(force > 0.0);
     }
 
     #[test]
-    fn positive_negative_and_neutral_are_distinct() {
-        let mut c = example();
-
-        c.signed_force = -127;
-        assert_eq!(c.polarity(), Polarity::Negative);
-        assert_eq!(c.force_magnitude(), 127);
-
-        c.signed_force = 0;
-        assert_eq!(c.polarity(), Polarity::Neutral);
-        assert_eq!(c.force_magnitude(), 0);
-
-        c.signed_force = 127;
-        assert_eq!(c.polarity(), Polarity::Positive);
-        assert_eq!(c.force_magnitude(), 127);
+    fn same_sign_evidence_reinforces_after_lazy_decay() {
+        let c = ResidualCommitment::new(0xA1, 0.40, 1).unwrap();
+        let next = c.apply_evidence(2, 0.30, 0.90, 0.000_001).unwrap().unwrap();
+        assert!((next.net_force - 0.66).abs() < EPS);
+        assert_eq!(next.last_updated_tick, 2);
     }
 
     #[test]
-    fn reserved_negative_128_is_rejected() {
-        let mut c = example();
-        c.signed_force = -128;
-        assert_eq!(c.pack(), Err(CommitmentError::ReservedForceValue));
+    fn opposite_sign_evidence_can_flip_direction() {
+        let c = ResidualCommitment::new(0xA1, 0.40, 1).unwrap();
+        let next = c.apply_evidence(2, -0.90, 0.90, 0.000_001).unwrap().unwrap();
+        assert!((next.net_force + 0.54).abs() < EPS);
+        assert_eq!(next.direction(), -1);
     }
 
     #[test]
-    fn context_is_separable_from_locus() {
-        let mut a = example();
-        let mut b = example();
-        a.context_tag = 1;
-        b.context_tag = 2;
-
-        assert_eq!(a.locus, b.locus);
-        assert_ne!(a.pack().unwrap(), b.pack().unwrap());
-
-        let aa = a.pack().unwrap().unpack().unwrap();
-        let bb = b.pack().unwrap().unpack().unwrap();
-        assert_eq!(aa.locus, bb.locus);
-        assert_ne!(aa.context_tag, bb.context_tag);
+    fn exact_cancellation_prunes_instead_of_storing_zero() {
+        let c = ResidualCommitment::new(0xA1, 0.50, 1).unwrap();
+        let next = c.apply_evidence(1, -0.50, 1.0, 0.0).unwrap();
+        assert_eq!(next, None);
     }
 
     #[test]
-    fn contradictory_commitments_can_share_locus_and_context() {
-        let mut positive = example();
-        let mut negative = example();
-        positive.signed_force = 72;
-        negative.signed_force = -81;
-
-        assert_eq!(positive.locus, negative.locus);
-        assert_eq!(positive.context_tag, negative.context_tag);
-        assert_ne!(positive.pack().unwrap(), negative.pack().unwrap());
-    }
-
-    #[test]
-    fn provenance_is_optional_and_does_not_change_width() {
-        let mut without = example();
-        let mut with = example();
-
-        without.provenance_handle = 0;
-        with.provenance_handle = 42;
-
-        assert!(!without.has_provenance());
-        assert!(with.has_provenance());
-        assert_eq!(without.pack().unwrap().as_bytes().len(), COMMITMENT_BYTES);
-        assert_eq!(with.pack().unwrap().as_bytes().len(), COMMITMENT_BYTES);
-    }
-
-    #[test]
-    fn all_maximum_field_values_round_trip() {
-        let c = ResidualCommitment {
-            locus: MAX_LOCUS,
-            context_tag: u16::MAX,
-            signed_force: 127,
-            binding_strength: MAX_BINDING,
-            generation_anchor: MAX_GENERATION_ANCHOR,
-            persistence_class: MAX_PERSISTENCE_CLASS,
-            kind: MAX_KIND,
-            flags: MAX_FLAGS,
-            provenance_handle: u16::MAX,
-        };
-
-        assert_eq!(c.pack().unwrap().unpack().unwrap(), c);
-    }
-
-    #[test]
-    fn out_of_range_fields_are_rejected_before_packing() {
-        let mut c = example();
-        c.locus = MAX_LOCUS + 1;
-        assert!(matches!(c.pack(), Err(CommitmentError::LocusOutOfRange(_))));
-
-        let mut c = example();
-        c.binding_strength = MAX_BINDING + 1;
-        assert!(matches!(c.pack(), Err(CommitmentError::BindingOutOfRange(_))));
-
-        let mut c = example();
-        c.generation_anchor = MAX_GENERATION_ANCHOR + 1;
-        assert!(matches!(c.pack(), Err(CommitmentError::GenerationOutOfRange(_))));
-
-        let mut c = example();
-        c.persistence_class = MAX_PERSISTENCE_CLASS + 1;
-        assert!(matches!(
-            c.pack(),
-            Err(CommitmentError::PersistenceClassOutOfRange(_))
-        ));
-
-        let mut c = example();
-        c.kind = MAX_KIND + 1;
-        assert!(matches!(c.pack(), Err(CommitmentError::KindOutOfRange(_))));
-
-        let mut c = example();
-        c.flags = MAX_FLAGS + 1;
-        assert!(matches!(c.pack(), Err(CommitmentError::FlagsOutOfRange(_))));
+    fn near_zero_force_can_be_pruned_by_policy_threshold() {
+        let c = ResidualCommitment::new(0xA1, 0.01, 1).unwrap();
+        let next = c.materialize_at(2, 0.90, 0.02).unwrap();
+        assert_eq!(next, None);
     }
 }

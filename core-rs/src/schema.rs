@@ -3,6 +3,10 @@
 //! Design rule: the file format is NEVER the in-memory Rust struct layout.
 //! Every field is encoded/decoded explicitly as little-endian bytes.
 //! This keeps `frank.cog` stable across compiler, platform, and refactors.
+//!
+//! Ground-state rule: `ArenaId::ResidualCommitment` is the authoritative
+//! cognitive arena. Symbolic arenas retained from the earlier schema are
+//! compatibility/projection caches, not independent cognitive truth.
 
 use core::fmt;
 
@@ -28,10 +32,6 @@ impl FormatVersion {
     };
 }
 
-/// File-format compatibility policy:
-/// - same major + file minor <= runtime minor: readable
-/// - older major: explicit OFFLINE migration required
-/// - newer major/minor: runtime refuses to guess
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Compatibility {
     Readable,
@@ -55,6 +55,12 @@ pub const fn compatibility(file: FormatVersion, runtime: FormatVersion) -> Compa
     }
 }
 
+/// Persistent arena identifiers.
+///
+/// IDs 1..=10 predate the Residual Commitment inversion and are intentionally
+/// retained to avoid gratuitous format churn on the experimental branch.
+/// They are projection/cache/support arenas unless explicitly documented
+/// otherwise. ID 11 is the authoritative ground cognitive arena.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u16)]
 pub enum ArenaId {
@@ -68,6 +74,7 @@ pub enum ArenaId {
     Provenance = 8,
     StringPool = 9,
     FreeList = 10,
+    ResidualCommitment = 11,
 }
 
 impl ArenaId {
@@ -83,8 +90,14 @@ impl ArenaId {
             8 => Some(Self::Provenance),
             9 => Some(Self::StringPool),
             10 => Some(Self::FreeList),
+            11 => Some(Self::ResidualCommitment),
             _ => None,
         }
+    }
+
+    /// Whether this arena is the source of persistent cognitive truth.
+    pub const fn is_cognitive_ground(self) -> bool {
+        matches!(self, Self::ResidualCommitment)
     }
 }
 
@@ -94,6 +107,8 @@ pub mod arena_flags {
     pub const HAS_FREE_LIST: u32 = 1 << 2;
     pub const VARIABLE_WIDTH: u32 = 1 << 3;
     pub const READ_ONLY: u32 = 1 << 4;
+    /// Marks an arena as a rebuildable projection/cache rather than ground truth.
+    pub const REBUILDABLE_CACHE: u32 = 1 << 5;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -132,19 +147,18 @@ impl FileHeader {
         put_u16(&mut out, 8, self.version.major);
         put_u16(&mut out, 10, self.version.minor);
         out[12] = ENDIAN_LITTLE;
-        out[13] = 0; // reserved
+        out[13] = 0;
         put_u16(&mut out, 14, self.flags);
         put_u16(&mut out, 16, HEADER_BYTES as u16);
         put_u16(&mut out, 18, ARENA_DESCRIPTOR_BYTES as u16);
         put_u16(&mut out, 20, self.arena_count);
-        put_u16(&mut out, 22, 0); // reserved
+        put_u16(&mut out, 22, 0);
         put_u64(&mut out, 24, self.created_at_ms);
         put_u64(&mut out, 32, self.last_written_ms);
         put_u64(&mut out, 40, self.generation);
         put_u64(&mut out, 48, self.arena_table_offset);
         put_u64(&mut out, 56, self.image_len);
         put_u32(&mut out, 64, self.arena_table_crc32);
-        // bytes 68..124 intentionally reserved for future metadata.
         let header_crc = crc32(&out[..124]);
         put_u32(&mut out, 124, header_crc);
         out
@@ -210,7 +224,6 @@ impl FileHeader {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ArenaDescriptor {
     pub arena_id: ArenaId,
-    /// Independent schema version for THIS arena only.
     pub arena_version: u16,
     pub flags: u32,
     /// Fixed record width. Must be zero when VARIABLE_WIDTH is set.
@@ -219,7 +232,6 @@ pub struct ArenaDescriptor {
     pub count: u64,
     pub offset: u64,
     pub byte_len: u64,
-    /// Generation in which this descriptor/data was last committed.
     pub generation: u64,
 }
 
@@ -230,13 +242,13 @@ impl ArenaDescriptor {
         put_u16(&mut out, 2, self.arena_version);
         put_u32(&mut out, 4, self.flags);
         put_u32(&mut out, 8, self.element_size);
-        put_u32(&mut out, 12, 0); // reserved/alignment, still explicit on disk
+        put_u32(&mut out, 12, 0);
         put_u64(&mut out, 16, self.capacity);
         put_u64(&mut out, 24, self.count);
         put_u64(&mut out, 32, self.offset);
         put_u64(&mut out, 40, self.byte_len);
         put_u64(&mut out, 48, self.generation);
-        put_u64(&mut out, 56, 0); // reserved
+        put_u64(&mut out, 56, 0);
         out
     }
 
@@ -281,7 +293,6 @@ impl ArenaDescriptor {
     }
 }
 
-/// Verify the descriptor table before any arena body is trusted or mapped.
 pub fn verify_arena_table(header: &FileHeader, table: &[u8]) -> Result<(), SchemaError> {
     let expected_len = header.arena_count as usize * ARENA_DESCRIPTOR_BYTES;
     if table.len() != expected_len {
@@ -302,11 +313,8 @@ pub fn verify_arena_table(header: &FileHeader, table: &[u8]) -> Result<(), Schem
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ArenaCompatibility {
-    /// Runtime knows this exact arena layout.
     Exact,
-    /// Runtime knows how to read this older version without mutating it.
     ReadOlder { file_version: u16, current_version: u16 },
-    /// File uses a newer arena layout than this runtime understands.
     UnsupportedFuture { file_version: u16, current_version: u16 },
 }
 
@@ -363,8 +371,6 @@ pub fn descriptor_table_crc32(descriptors: &[ArenaDescriptor]) -> u32 {
     !crc
 }
 
-/// Tiny dependency-free IEEE CRC-32 implementation. Metadata is small, so table-driven
-/// optimization is unnecessary here and avoiding a crate keeps the format bootstrap minimal.
 pub fn crc32(bytes: &[u8]) -> u32 {
     let mut crc = !0u32;
     for &byte in bytes {
@@ -450,20 +456,27 @@ mod tests {
     }
 
     #[test]
-    fn arena_descriptor_round_trip_is_stable() {
+    fn residual_commitment_arena_is_ground_and_round_trips() {
         let descriptor = ArenaDescriptor {
-            arena_id: ArenaId::Relation,
+            arena_id: ArenaId::ResidualCommitment,
             arena_version: 1,
-            flags: arena_flags::SORTED | arena_flags::HAS_FREE_LIST,
-            element_size: 24,
+            flags: arena_flags::SPARSE | arena_flags::SORTED | arena_flags::HAS_FREE_LIST,
+            element_size: 16,
             capacity: 1_000_000,
             count: 42,
             offset: 8192,
-            byte_len: 24_000_000,
+            byte_len: 16_000_000,
             generation: 7,
         };
+        assert!(descriptor.arena_id.is_cognitive_ground());
         let bytes = descriptor.encode();
         assert_eq!(ArenaDescriptor::decode(&bytes).unwrap(), descriptor);
+    }
+
+    #[test]
+    fn legacy_symbolic_arena_is_not_ground() {
+        assert!(!ArenaId::Belief.is_cognitive_ground());
+        assert!(!ArenaId::Relation.is_cognitive_ground());
     }
 
     #[test]
@@ -490,9 +503,9 @@ mod tests {
     #[test]
     fn arena_table_crc_detects_damage() {
         let descriptors = [ArenaDescriptor {
-            arena_id: ArenaId::Entity,
+            arena_id: ArenaId::ResidualCommitment,
             arena_version: 1,
-            flags: 0,
+            flags: arena_flags::SPARSE,
             element_size: 16,
             capacity: 8,
             count: 2,
