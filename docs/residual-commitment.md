@@ -9,10 +9,10 @@ Frank's persistent cognitive source of truth is a **Residual Commitment Field**.
 A **Residual Commitment** is the entire compact tuple, not merely a scalar weight:
 
 - **locus** — where in cognitive possibility space the commitment applies
-- **polarity** — which local alternative/direction is preferred or resisted
-- **residual force** — how strongly prior cognitive work still biases future cognition
+- **polarity + residual force** — represented together as a graded signed force
 - **contextual binding** — how tightly that bias is bound to a particular context
 - **temporal persistence** — how the commitment survives, decays, or remains available through time
+- **universal structural state** — only those tiny distinctions that prove valid across cognition
 - **optional provenance** — an expensive link allocated only when later explanation/audit is worth the storage cost
 
 The proposition is **not** the ground record. A proposition is a projection of one or more commitments.
@@ -35,7 +35,7 @@ Any persistent cache whose loss makes this impossible has accidentally become gr
 
 Provenance is intentionally optional and comparatively expensive.
 
-The default commitment record must not pay a permanent pointer cost for provenance. High-stakes commitments, explicit learning events, contested commitments, or commitments that require later audit/explanation may allocate an auxiliary provenance entry. Ordinary low-value commitments should remain completely inline.
+The default commitment record must not pay a full pointer cost for provenance. High-stakes commitments, explicit learning events, contested commitments, or commitments that require later audit/explanation may allocate an auxiliary provenance entry. Ordinary low-value commitments should remain completely inline.
 
 ## Why the inversion matters
 
@@ -71,28 +71,34 @@ The first pressure-test uses 128 bits because 64 bits appears too restrictive if
 128 bits / 16 bytes
 
 word 0
-  locus              48 bits
-  context_tag        16 bits
+  locus               48 bits
+  context_tag         16 bits
 
 word 1
-  residual_force      8 bits
-  polarity             1 bit
+  signed_force         8 bits
   binding_strength     7 bits
-  temporal_anchor     24 bits
-  persistence_class    8 bits
-  aux_ref             16 bits
+  generation_anchor   20 bits
+  persistence_class    5 bits
+  kind                 4 bits
+  flags                4 bits
+  provenance_handle   16 bits
 ```
 
-Interpretation:
+Exactly 128 bits.
+
+### Interpretation
 
 - `locus` is a compact address in cognitive space, not an EntityId or proposition hash by definition.
-- `context_tag` is a local discriminator used to prevent nearby meanings from collapsing when context materially changes interpretation.
-- `residual_force` is quantized 0..255.
-- `polarity` is directional/oppositional state, not truth/falsity.
-- `binding_strength` expresses how strongly context constrains the commitment.
-- `temporal_anchor` is a compact generation/time reference; wraparound must be handled relative to the image generation epoch.
-- `persistence_class` selects a decay/retention regime rather than storing a large timestamp/half-life tuple in every atom.
-- `aux_ref == 0` means no expensive auxiliary payload. Non-zero values address an auxiliary segment/local pool, allowing provenance or rare richer payloads without bloating ordinary commitments.
+- `context_tag` is deliberately separate from the locus so context sensitivity is not irreversibly collapsed into addressing.
+- `signed_force` combines polarity and magnitude in one graded field. Candidate A reserves `-128`, leaving a symmetric usable range of `-127..=127`; `0` is neutral/no directional residual force.
+- `binding_strength` is `0..=127` and expresses how tightly context constrains the commitment.
+- `generation_anchor` is a compact 20-bit relative time/generation reference. Its epoch and wrap semantics are image-level concerns, not stored redundantly in each atom.
+- `persistence_class` selects one of at most 32 decay/retention regimes rather than storing a large half-life/timestamp tuple per record.
+- `kind` is four bits reserved only for structural distinctions that prove truly universal. No entity/relation/goal ontology is allowed to leak into it merely because bits are available.
+- `flags` is another four bits of universal state. Their meanings are intentionally unassigned until experiments force them.
+- `provenance_handle == 0` means no provenance. A non-zero 16-bit handle addresses an auxiliary local pool when explanation/audit is worth the cost.
+
+Candidate A therefore keeps the common case at exactly 16 bytes while preserving independent locus, context, force, binding, temporal state, and optional provenance.
 
 The exact widths are subject to destruction by benchmarks. Candidate A exists to give the theory something concrete to attack.
 
@@ -152,12 +158,13 @@ Any required index overhead must be measured separately and treated as a cache c
 ## Things deliberately NOT decided yet
 
 - whether loci are hashes, learned addresses, hyperdimensional coordinates, hierarchical addresses, or a hybrid
-- whether polarity remains one bit or becomes a small directional code
+- whether signed scalar force ultimately survives or becomes a small directional code
 - the exact decay equation / persistence classes
-- whether context belongs partly in the locus rather than as an explicit tag
-- how auxiliary references are segmented beyond 65,535 local entries
-- whether 96 bits is a superior eventual packing target
+- whether context belongs partly in the locus in addition to the explicit tag
+- how provenance handles are segmented beyond 65,535 local entries
+- whether 96 bits is a superior eventual packing target after measurements
 - whether multiple commitments at the same locus are stored adjacently, bucketed, or indexed separately
+- meanings for `kind` and `flags`
 - how symbolic projections learn their interpretation rules
 - how the neural substrate writes candidate commitments without corrupting locality
 
