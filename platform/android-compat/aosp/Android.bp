@@ -1,0 +1,23 @@
+// Reference AOSP integration. This file is intentionally isolated from the
+// standalone Cargo build; copy/adapt it inside an AOSP source tree.
+
+rust_binary {
+    name: "frankd",
+    crate_name: "frankd",
+    srcs: ["../src/bin/frankd.rs"],
+    edition: "2021",
+    rustlibs: ["libfrank_android_compat"],
+    init_rc: ["init/frank.rc"],
+}
+
+rust_library {
+    name: "libfrank_android_compat",
+    crate_name: "frank_android_compat",
+    srcs: ["../src/lib.rs"],
+    edition: "2021",
+}
+
+filegroup {
+    name: "frank_policy_aidl",
+    srcs: ["aidl/com/frank/policy/*.aidl"],
+}
