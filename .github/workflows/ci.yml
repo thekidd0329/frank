@@ -21,6 +21,8 @@ jobs:
         with:
           python-version: '3.12'
 
+      - uses: dtolnay/rust-toolchain@stable
+
       - name: Install Kotlin 1.9.0
         run: |
           curl -fsSL -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v1.9.0/kotlin-compiler-1.9.0.zip
