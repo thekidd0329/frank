@@ -1,0 +1,8 @@
+type frankd, domain;
+type frankd_exec, exec_type, system_file_type, file_type;
+
+init_daemon_domain(frankd)
+
+# Keep the daemon intentionally constrained. Add only narrowly-reviewed
+# permissions as concrete brokers are integrated.
+allow frankd self:process { getpgid getsched setsched signal };
