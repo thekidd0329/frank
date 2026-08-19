@@ -27,5 +27,8 @@ jobs:
           unzip -q kotlin.zip -d "$RUNNER_TEMP/kotlin"
           echo "$RUNNER_TEMP/kotlin/kotlinc/bin" >> "$GITHUB_PATH"
 
+      - name: Install Python test dependency
+        run: python -m pip install pytest
+
       - name: Run core and prototype tests
         run: ./test.sh
