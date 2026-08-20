@@ -41,12 +41,13 @@ jobs:
       - name: Run frankd reference daemon
         run: cargo run --manifest-path platform/android-compat/Cargo.toml --bin frankd
 
-      - name: Smoke test interactive Frank learning
-        env:
-          FRANK_HOME: ${{ runner.temp }}/frank-home
+      - name: Smoke test Kotlin newborn teacher
         run: |
-          printf 'I was talking about Merkaba today.\nIt is a concept involving geometry and spirituality.\n/memory\n/quit\n' \
-            | cargo run --quiet --manifest-path platform/android-compat/Cargo.toml --bin frank \
-            | tee "$RUNNER_TEMP/frank-smoke.txt"
-          grep -q 'What is Merkaba?' "$RUNNER_TEMP/frank-smoke.txt"
-          grep -q 'merkaba --definition-->' "$RUNNER_TEMP/frank-smoke.txt"
+          FIELD="$RUNNER_TEMP/newborn.cog"
+          printf '/observe teacher.work music 0.40 +\n/contradict teacher.work music 0.90\n/field\n/restore\n/quit\n' \
+            | kotlin -classpath build/frank-bones.jar frank.cli.TeachMain --field "$FIELD" \
+            | tee "$RUNNER_TEMP/frank-teacher-smoke.txt"
+          grep -q 'opposing pressure teacher.work=music -> NEGATIVE 0.500' "$RUNNER_TEMP/frank-teacher-smoke.txt"
+          grep -q 'QUESTION_TARGET' "$RUNNER_TEMP/frank-teacher-smoke.txt"
+          grep -q 'restore PASS' "$RUNNER_TEMP/frank-teacher-smoke.txt"
+          test -s "$FIELD"
