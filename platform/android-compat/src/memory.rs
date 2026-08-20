@@ -73,9 +73,6 @@ impl MemoryStore {
             .map(|old| old.value != fact.value || old.confidence != fact.confidence)
             .unwrap_or(true);
         self.known_concepts.insert(fact.subject.clone());
-        for concept in concept_tokens(&fact.value) {
-            self.known_concepts.insert(concept);
-        }
         self.facts.insert(fact.key(), fact);
         if changed {
             self.save()?;
@@ -209,7 +206,7 @@ pub fn normalize(input: impl AsRef<str>) -> String {
 pub fn concept_tokens(text: &str) -> Vec<String> {
     text.split_whitespace()
         .map(normalize)
-        .filter(|s| s.len() >= 3 && !is_stopword(s))
+        .filter(|s| s.len() >= 5 && !is_stopword(s))
         .collect()
 }
 
@@ -220,7 +217,10 @@ fn is_stopword(s: &str) -> bool {
             | "are" | "was" | "were" | "have" | "has" | "had" | "his" | "her" | "their" | "our" | "not"
             | "just" | "like" | "really" | "about" | "what" | "when" | "where" | "who" | "why" | "how"
             | "can" | "could" | "would" | "should" | "will" | "did" | "does" | "doing" | "its" | "it's"
-            | "i'm" | "im" | "ive" | "i've" | "my" | "mine" | "me" | "we" | "they" | "them" | "then"
+            | "i'm" | "im" | "ive" | "i've" | "mine" | "they" | "them" | "then" | "there" | "here"
+            | "today" | "yesterday" | "tomorrow" | "working" | "talked" | "telling" | "something" | "anything"
+            | "thing" | "things" | "know" | "think" | "going" | "right" | "maybe" | "pretty" | "still"
+            | "because" | "called" | "means" | "understand" | "remember" | "learned" | "learning" | "want"
     )
 }
 
