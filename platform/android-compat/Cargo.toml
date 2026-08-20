@@ -2,7 +2,7 @@
 name = "frank-android-compat"
 version = "0.2.0"
 edition = "2021"
-description = "Reference control plane and local learning prototype for Frank's Android-compatible operating-system architecture"
+description = "Deterministic Android-compatible control plane for Frank"
 license = "Apache-2.0"
 
 [lib]
@@ -12,9 +12,5 @@ path = "src/lib.rs"
 [[bin]]
 name = "frankd"
 path = "src/bin/frankd.rs"
-
-[[bin]]
-name = "frank"
-path = "src/bin/frank.rs"
 
 [dependencies]
