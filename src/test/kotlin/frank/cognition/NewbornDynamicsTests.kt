@@ -33,10 +33,13 @@ object NewbornDynamicsTests {
     }
 
     private fun contingencySeparatesPredictedFromUnpredictedChange() {
-        val state = ContingencyState().update(predictedChange = 1f, actualChange = 1f)
-        val mismatch = state.update(predictedChange = 1f, actualChange = -1f)
-        check(state.omega > 0.5f)
-        check(mismatch.omega < state.omega)
+        var learned = ContingencyState()
+        repeat(5) {
+            learned = learned.update(predictedChange = 1f, actualChange = 1f)
+        }
+        val mismatch = learned.update(predictedChange = 1f, actualChange = -1f)
+        check(learned.omega > 0.5f)
+        check(mismatch.omega < learned.omega)
     }
 
     private fun newbornStartsUndifferentiated() {
