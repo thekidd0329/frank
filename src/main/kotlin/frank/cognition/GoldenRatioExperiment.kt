@@ -1,10 +1,10 @@
 package frank.cognition
 
 /**
- * Experimental geometric scaffold for developmental experiments.
+ * Canonical geometric scaffold for Frank's developmental architecture.
  *
- * The golden ratio is a measurable hypothesis about spacing and allocation,
- * not a pre-installed cognitive law. This class contains no semantic labels,
+ * The golden ratio is a canonical organizing principle for spacing and allocation,
+ * without becoming a pre-installed semantic identity or finished trait. This class contains no semantic labels,
  * personality, emotion, or ontology.
  */
 object GoldenRatioExperiment {
