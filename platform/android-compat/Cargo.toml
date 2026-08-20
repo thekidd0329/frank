@@ -1,6 +1,6 @@
 [package]
 name = "frank-android-compat"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "Deterministic Android-compatible control plane for Frank"
 license = "Apache-2.0"
@@ -12,5 +12,9 @@ path = "src/lib.rs"
 [[bin]]
 name = "frankd"
 path = "src/bin/frankd.rs"
+
+[[bin]]
+name = "frank-actiond"
+path = "src/bin/frank_actiond.rs"
 
 [dependencies]
