@@ -41,6 +41,9 @@ jobs:
       - name: Run frankd reference daemon
         run: cargo run --manifest-path platform/android-compat/Cargo.toml --bin frankd
 
+      - name: Run Frank action routing daemon
+        run: cargo run --manifest-path platform/android-compat/Cargo.toml --bin frank-actiond
+
       - name: Smoke test Kotlin newborn teacher
         run: |
           FIELD="$RUNNER_TEMP/newborn.cog"
