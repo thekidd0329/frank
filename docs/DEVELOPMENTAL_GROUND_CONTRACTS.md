@@ -26,7 +26,19 @@ Newborn experiments should remain small, bounded, and age-appropriate. Computati
 
 Experiments should record what was exposed, what changed, and what remained unknown.
 
-## 4. Reconstruction is a hard invariant
+## 4. Canonical geometric organization
+
+The golden ratio is a canonical organizing principle in Frank's architecture. It may govern developmental spacing, sequencing, allocation, phase distribution, locality scaffolds, and other structural relationships.
+
+Canonical does not mean every observed phenomenon is forced to fit phi. Implementations must preserve the distinction between:
+
+- the canonical geometric rule;
+- measured behavior produced by that rule;
+- unresolved biological or cognitive interpretation.
+
+The golden ratio must organize structure without silently supplying semantic labels, personality, emotions, or a finished self-model.
+
+## 5. Reconstruction is a hard invariant
 
 For every cognitive feature, maintain a reconstruction path:
 
@@ -39,7 +51,7 @@ For every cognitive feature, maintain a reconstruction path:
 
 No cognitive feature may depend on an unrecorded side channel.
 
-## 5. Uncertainty stays visible
+## 6. Uncertainty stays visible
 
 The system should preserve uncertainty, contradiction, decay, and missing evidence instead of converting them into confident prose. Tests should distinguish:
 
@@ -50,15 +62,15 @@ The system should preserve uncertainty, contradiction, decay, and missing eviden
 
 A contradiction should modify the field according to the current developmental rules; it should not be erased merely to keep a projection tidy.
 
-## 6. Authority is separate from cognition
+## 7. Authority is separate from cognition
 
 Writing, proposing, or simulating an action is not the same as executing an external effect. Any future effectful pathway must represent durable intent, execution state, and verification so process death cannot create duplicate effects.
 
 Android and other platforms remain subordinate interfaces. They must not become hidden cognitive state or the sovereign owner of Frank's identity.
 
-## 7. ABI and topology remain open
+## 8. ABI and topology remain open
 
-Do not freeze the experimental 128-bit atom layout, locality-preserving locus construction, or other unresolved topology merely because a prototype can serialize it. Versioned storage boundaries may be tested independently from the cognitive representation.
+Do not freeze experimental storage layouts or unresolved locus-construction details merely because a prototype can serialize them. Canonical geometry does not require a frozen binary ABI. Versioned storage boundaries may be tested independently from the cognitive representation.
 
 ## Review checklist
 
@@ -66,6 +78,7 @@ Before accepting an implementation, reviewers should be able to answer “yes”
 
 - Does the change add a developmental condition rather than a finished trait?
 - Is the Residual Commitment Field authoritative?
+- Is canonical geometry used consistently where structure requires it?
 - Can derived state be discarded and rebuilt?
 - Are uncertainty, contradiction, decay, and missing evidence preserved?
 - Is the change stage-appropriate?
