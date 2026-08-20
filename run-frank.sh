@@ -2,13 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MANIFEST="$ROOT/platform/android-compat/Cargo.toml"
+cd "$ROOT"
 
-if ! command -v cargo >/dev/null 2>&1; then
-  echo "Frank needs Rust/Cargo installed." >&2
-  echo "Ubuntu/Debian: sudo apt install cargo" >&2
-  echo "Or install Rust with rustup: https://rustup.rs" >&2
+if ! command -v kotlinc >/dev/null 2>&1; then
+  echo "Frank needs Kotlin (kotlinc) installed." >&2
+  echo "Ubuntu/Debian: install a JDK and Kotlin compiler, or use the repo CI toolchain." >&2
   exit 1
 fi
 
-exec cargo run --quiet --manifest-path "$MANIFEST" --bin frank
+./compile.sh
+exec kotlin -classpath build/frank-bones.jar frank.cli.TeachMain "$@"
