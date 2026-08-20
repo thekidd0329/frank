@@ -1,87 +1,74 @@
 # Frank Android Compatibility Control Plane
 
-This directory is the first executable slice of the Frank operating-system architecture.
-It does **not** make Frank an AccessibilityService, VPN app, or root-capable LLM. Instead it models the intended system boundary:
+This directory is the executable slice of Frank's Android-compatible **OS control plane**. It is not Frank's mind.
 
-- cognition proposes actions;
-- deterministic Rust policy decides capabilities;
-- brokers own narrow operating-system powers;
-- Android apps remain ordinary UID-scoped Android apps;
-- trust-root state is isolated behind a tiny interface intended to move to AVF/pKVM later;
-- conversational memory and curiosity stay local and do not gain privileged OS authority.
+Frank's cognitive ground truth remains the existing Kotlin `frank.cognition` Residual Commitment Field. The Rust code here is intentionally limited to deterministic OS authority: policy, UID-scoped networking, normalized events, and trust-root integration.
 
-## Talk to Frank on Linux
+## Newborn teacher on Linux
 
 From the repository root:
 
 ```bash
-bash run-frank.sh
+bash run-frank.sh --field ~/.frank/newborn.cog
 ```
 
-Or directly:
+`run-frank.sh` compiles the existing Kotlin source tree and starts `frank.cli.TeachMain`. No second Python/Rust memory chatbot is involved.
 
-```bash
-cargo run --manifest-path platform/android-compat/Cargo.toml --bin frank
-```
-
-Frank stores learned memory at `~/.frank/memory.tsv`. Set `FRANK_HOME=/some/path` to use a different local memory directory.
-
-There is no cloud model or remote API dependency in this prototype. The conversation loop is a local symbolic learning system: it extracts explicit facts, notices unresolved concepts in what the user says, ranks those knowledge gaps, and generates its next question from the highest-ranked unresolved gap. There is deliberately **no canned question list**.
-
-Example behavior:
+The terminal is only teacher I/O over existing cognition:
 
 ```text
-You: I was talking to Akira about Merkaba.
-Frank: Okay. What is Akira?
-You: Akira is someone extremely important to me.
-Frank: Got it. I saved how akira relates to you. What is Merkaba?
+teacher evidence
+    -> EvidenceToCommitment
+    -> ReasoningEngine.absorb(...)
+    -> CommitmentField
+    -> rebuildable projections
 ```
 
-The exact question depends on what Frank already knows. Once a concept has been answered, its knowledge gap is closed and it is not repeatedly asked as a first-time question.
+Plain text and `/say` are journaled as `USERASSERTED` evidence only and **do not alter the Residual Commitment Field**. The field changes only through explicit absorb/reinforce/contradict paths.
 
-Terminal commands:
+Commands:
 
 ```text
-/memory   show learned facts
-/pending  show the current unresolved question
-/forget   erase Frank's local learned memory
-/help     show commands
-/quit     save and exit
+/observe <axis> <value> [force] [polarity]
+/say <free text>
+/reinforce <axis> <value> [force]
+/contradict <axis> <value> [force]
+/tick [n]
+/field
+/project
+/gaps
+/ask
+/restore
+/quit
 ```
 
-## Run tests
+`/gaps` finds weak or contested residual commitments. `/ask` (and state-changing teaching commands) select the next question target from those field gaps. The target comes from cognition; wording is a thin deterministic surface and is never ground truth.
+
+`/restore` exercises the reconstruction invariant: snapshot the Residual Commitment Field, rebuild the engine from that field, and fail if the activation set changes.
+
+### Important locus rule
+
+The existing bridge addresses a locus by `(axisId, valueId)`. Therefore `teacher.work=music` and `teacher.work=design` are separate loci. Opposing pressure must target the same axis/value locus unless a future exclusivity/competition projection explicitly relates alternatives.
+
+The teacher CLI uses deterministic IDs derived from the teacher-provided English labels. Those labels are acknowledged scaffolding for this development phase, not evidence that Frank learned English ontology from nothing.
+
+## Android control-plane prototype
+
+The Rust crate remains separate from cognition:
+
+- `policy.rs` — default-deny capability engine; cognition cannot grant itself authority.
+- `network.rs` — UID-scoped network policy model, targeting AOSP netd/eBPF integration.
+- `event.rs` — bounded normalized event bus.
+- `trust.rs` — tiny trust-root abstraction intended to move behind AVB/AVF/pKVM.
+- `aosp/` — Soong, init, SELinux, and Stable AIDL/Binder integration scaffold.
+
+Run it independently with:
 
 ```bash
 cargo test --manifest-path platform/android-compat/Cargo.toml
 cargo run --manifest-path platform/android-compat/Cargo.toml --bin frankd
 ```
 
-The standalone crate uses only the Rust standard library so the core prototype can compile without Android or third-party Rust dependencies.
+## Non-negotiable boundary
 
-## Components
-
-- `conversation.rs` — interactive turn engine. Answers from Frank's own questions become new memory.
-- `curiosity.rs` — derives questions from unresolved names, concepts, and thin relationships in the current conversation. No interview script is embedded.
-- `memory.rs` — persistent local fact/concept memory using a dependency-free disk format.
-- `policy.rs` — default-deny capability engine. It includes immutable denials so the cognitive process cannot grant itself authority.
-- `network.rs` — UID-scoped network policy model with optional expiry. The AOSP implementation target is netd/eBPF rather than `VpnService`.
-- `event.rs` — bounded normalized-event bus. Raw kernel/Binder noise should be reduced before cognition sees it.
-- `trust.rs` — write-once trust-root abstraction. The in-memory implementation is only a test double; the target is an AVB/pKVM-backed implementation.
-- `aosp/` — integration scaffold for Soong, init, SELinux, and Stable AIDL/Binder.
-
-## Non-negotiable security rule
-
-`frank-modeld` must never directly own Linux network administration, boot control, signing keys, SELinux policy, package-install authority, or trust-root write access. A compromised model may submit a request; it must not manufacture an operating-system permission.
-
-Conversational curiosity is intentionally outside that authority boundary. Frank is free to wonder, ask, learn, forget, and revise cognitive state; privileged actions still pass through deterministic policy.
-
-## Next integration milestones
-
-1. Build the crate in Cuttlefish/AOSP with Soong.
-2. Register `frank.policy` as a Binder service in a dedicated SELinux domain.
-3. Split the demonstration process into `frank-modeld`, `frank-policyd`, and `frank-netd` domains.
-4. Map `NetworkPolicy` to Android netd/eBPF UID rules.
-5. Feed normalized package/process/network events into `EventBus`.
-6. Run CTS regression subsets after every platform change.
-7. Move only identity, policy roots, release hashes, rollback state, and audit roots into AVF/pKVM.
-8. Sign production images with Frank-owned AVB keys and relock the boot chain.
+The cognitive process may learn, decay, contradict, project, and ask. It must not directly own Linux network administration, boot control, signing keys, SELinux policy, package-install authority, or trust-root write access. Evidence may change belief; it cannot promote itself into authority.
