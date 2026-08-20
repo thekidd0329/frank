@@ -13,6 +13,9 @@ pub enum Capability {
     BackgroundNetwork,
     ReadSemanticMemory,
     ProposeAction,
+    ExecuteAppFunction,
+    UseComputerControl,
+    ExecuteNativeBroker,
     ChangeNetworkPolicy,
     ReadTrustRoot,
     WriteTrustRoot,
@@ -129,6 +132,30 @@ mod tests {
                 subject: app,
                 capability: Capability::LocalNetwork,
                 rationale: "LAN discovery".into(),
+            }),
+            Decision::Deny(_)
+        ));
+    }
+
+    #[test]
+    fn action_capabilities_are_independent() {
+        let actiond = Subject::FrankComponent("frank-actiond");
+        let mut policy = PolicyEngine::new();
+        policy.grant(actiond.clone(), Capability::ExecuteAppFunction).unwrap();
+
+        assert_eq!(
+            policy.decide(&CapabilityRequest {
+                subject: actiond.clone(),
+                capability: Capability::ExecuteAppFunction,
+                rationale: "structured app action".into(),
+            }),
+            Decision::Allow
+        );
+        assert!(matches!(
+            policy.decide(&CapabilityRequest {
+                subject: actiond,
+                capability: Capability::UseComputerControl,
+                rationale: "UI fallback".into(),
             }),
             Decision::Deny(_)
         ));
