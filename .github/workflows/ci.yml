@@ -40,3 +40,13 @@ jobs:
 
       - name: Run frankd reference daemon
         run: cargo run --manifest-path platform/android-compat/Cargo.toml --bin frankd
+
+      - name: Smoke test interactive Frank learning
+        env:
+          FRANK_HOME: ${{ runner.temp }}/frank-home
+        run: |
+          printf 'I was talking about Merkaba today.\nIt is a concept involving geometry and spirituality.\n/memory\n/quit\n' \
+            | cargo run --quiet --manifest-path platform/android-compat/Cargo.toml --bin frank \
+            | tee "$RUNNER_TEMP/frank-smoke.txt"
+          grep -q 'What is Merkaba?' "$RUNNER_TEMP/frank-smoke.txt"
+          grep -q 'merkaba --definition-->' "$RUNNER_TEMP/frank-smoke.txt"
