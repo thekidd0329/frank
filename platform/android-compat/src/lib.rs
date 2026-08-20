@@ -2,13 +2,19 @@
 //!
 //! Cognition remains in the existing Kotlin Residual Commitment Field.
 //! This Rust crate is intentionally limited to deterministic OS authority:
-//! policy, networking, normalized events, and trust-root integration.
+//! policy, action routing, networking, normalized events, and trust-root integration.
 
+pub mod action;
 pub mod event;
 pub mod network;
 pub mod policy;
 pub mod trust;
 
+pub use action::{
+    ActionBackend, ActionBackendKind, ActionExecution, ActionOrchestrator, ActionRequest, ActionStatus,
+    ActionTarget, AppFunctionsBackend, ComputerControlBackend, ConsentRequirement, NativeBrokerBackend,
+    NetworkNeed,
+};
 pub use event::{EventBus, NormalizedEvent};
 pub use network::{NetworkBroker, NetworkPolicy};
 pub use policy::{Capability, CapabilityRequest, Decision, PolicyEngine, Subject};
