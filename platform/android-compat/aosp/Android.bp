@@ -10,6 +10,14 @@ rust_binary {
     init_rc: ["init/frank.rc"],
 }
 
+rust_binary {
+    name: "frank-actiond",
+    crate_name: "frank_actiond",
+    srcs: ["../src/bin/frank_actiond.rs"],
+    edition: "2021",
+    rustlibs: ["libfrank_android_compat"],
+}
+
 rust_library {
     name: "libfrank_android_compat",
     crate_name: "frank_android_compat",
@@ -20,4 +28,9 @@ rust_library {
 filegroup {
     name: "frank_policy_aidl",
     srcs: ["aidl/com/frank/policy/*.aidl"],
+}
+
+filegroup {
+    name: "frank_action_aidl",
+    srcs: ["aidl/com/frank/action/*.aidl"],
 }
