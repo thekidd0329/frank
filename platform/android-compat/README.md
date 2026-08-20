@@ -2,7 +2,7 @@
 
 This directory is the executable slice of Frank's Android-compatible **OS control plane**. It is not Frank's mind.
 
-Frank's cognitive ground truth remains the existing Kotlin `frank.cognition` Residual Commitment Field. The Rust code here is intentionally limited to deterministic OS authority: policy, UID-scoped networking, normalized events, and trust-root integration.
+Frank's cognitive ground truth remains the existing Kotlin `frank.cognition` Residual Commitment Field. The Rust code here is intentionally limited to deterministic OS authority: policy, action routing, UID-scoped networking, normalized events, and trust-root integration.
 
 ## Newborn teacher on Linux
 
@@ -57,18 +57,39 @@ The teacher CLI uses deterministic IDs derived from the teacher-provided English
 The Rust crate remains separate from cognition:
 
 - `policy.rs` — default-deny capability engine; cognition cannot grant itself authority.
+- `action.rs` — policy/consent-gated backend-neutral action router.
 - `network.rs` — UID-scoped network policy model, targeting AOSP netd/eBPF integration.
 - `event.rs` — bounded normalized event bus.
 - `trust.rs` — tiny trust-root abstraction intended to move behind AVB/AVF/pKVM.
-- `aosp/` — Soong, init, SELinux, and Stable AIDL/Binder integration scaffold.
+- `aosp/` — Soong, init, SELinux, AIDL/Binder, and Android-17 action-backend integration scaffold.
 
-Run it independently with:
+The action path is deliberately layered:
+
+```text
+Kotlin RCF / goal-control
+        ↓ action proposal
+Rust policy + consent gate
+        ↓
+AppFunctions      Computer Control      Native broker
+(structured)      (UI fallback)         (OS capability)
+        ↓                  ↓                    ↓
+              normal Android platform
+```
+
+`frank-modeld` should normally hold only `ProposeAction`. The privileged executor (`frank-actiond`) receives separate capabilities for AppFunctions, Computer Control, and native brokers. A model prompt therefore cannot grant itself operating-system authority.
+
+If a target app needs networking, the action may carry an explicit UID-scoped `NetworkNeed`. The router verifies that capability but never grants it implicitly; temporary policy changes remain the job of the network-policy service.
+
+Run the Rust control-plane prototype independently with:
 
 ```bash
 cargo test --manifest-path platform/android-compat/Cargo.toml
 cargo run --manifest-path platform/android-compat/Cargo.toml --bin frankd
+cargo run --manifest-path platform/android-compat/Cargo.toml --bin frank-actiond
 ```
+
+See `aosp/ACTION_BACKENDS.md` for the Android 17 AppFunctions / Computer Control adapter contract and user-takeover/consent rules.
 
 ## Non-negotiable boundary
 
-The cognitive process may learn, decay, contradict, project, and ask. It must not directly own Linux network administration, boot control, signing keys, SELinux policy, package-install authority, or trust-root write access. Evidence may change belief; it cannot promote itself into authority.
+The cognitive process may learn, decay, contradict, project, ask, and propose. It must not directly own Computer Control permission/AppOp state, Linux network administration, boot control, signing keys, SELinux policy, package-install authority, or trust-root write access. Evidence may change belief; it cannot promote itself into authority.
