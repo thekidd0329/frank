@@ -11,11 +11,18 @@ object NewbornDynamicsTests {
     }
 
     private fun learningProgressCanReduceEpistemicTension() {
-        val initial = EpistemicTension(value = 0.5f)
-        val first = initial.update(predictionError = 0.8f, uncertainty = 0.8f)
-        val second = first.update(predictionError = 0.2f, uncertainty = 0.4f)
-        check(first.value >= 0f)
-        check(second.value < first.value || second.fastError < first.fastError)
+        // This represents a real learning-progress condition: the slow error
+        // trace still reflects a previously difficult prediction while the
+        // fast trace has already fallen. In that state, slow-fast is positive
+        // and should relieve epistemic tension.
+        val improving = EpistemicTension(
+            value = 0.5f,
+            fastError = 0.1f,
+            slowError = 0.5f
+        )
+        val after = improving.update(predictionError = 0.1f, uncertainty = 0.2f)
+        check(after.fastError < after.slowError)
+        check(after.value < improving.value)
     }
 
     private fun loadAccumulatesAwakeAndReducesDuringSleep() {
