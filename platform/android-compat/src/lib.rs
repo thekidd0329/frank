@@ -5,6 +5,7 @@
 //! policy, action routing, networking, normalized events, and trust-root integration.
 
 pub mod action;
+pub mod computer_control;
 pub mod event;
 pub mod network;
 pub mod policy;
@@ -14,6 +15,9 @@ pub use action::{
     ActionBackend, ActionBackendKind, ActionExecution, ActionOrchestrator, ActionRequest, ActionStatus,
     ActionTarget, AppFunctionsBackend, ComputerControlBackend, ConsentRequirement, NativeBrokerBackend,
     NetworkNeed,
+};
+pub use computer_control::{
+    ComputerControlSession, ComputerControlSessionManager, ControlInput, SessionError,
 };
 pub use event::{EventBus, NormalizedEvent};
 pub use network::{NetworkBroker, NetworkPolicy};
