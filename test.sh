@@ -13,6 +13,11 @@ java -cp build/frank-tests.jar:build/frank-bones.jar frank.tests.ArchitectureTes
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.ResidualCommitmentTests
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.CognitiveEnvironmentSimulation
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.DevelopmentalSleepAndValuesTest
+java -cp build/frank-tests.jar:build/frank-bones.jar frank.tests.GoalControlTestsKt
+java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NewbornStateTests
+java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NewbornLearningLoopTests
+java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.HomeostaticTensionTests
+java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NewbornDynamicsTests
 
 if [[ -d prototype/python ]]; then
   (cd prototype/python && python -m pytest -q)
