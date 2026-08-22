@@ -74,4 +74,14 @@ The phase is complete only when the Linux-terminal newborn can demonstrate, from
 5. derived state can be rebuilt from the Residual Commitment Field;
 6. the same sequence is reproducible without Android, network access, or an external model acting as cognitive authority.
 
-Only after these invariants pass should Frank acquire the next environmental layer.
+## First learning gate
+
+After persistence is demonstrated, the next permitted developmental primitive is learned co-occurrence between opaque loci.
+
+Repeated paired experience may strengthen an association. Passive time may weaken it. Retrieval may occur only while the learned association remains above the active memory profile's threshold.
+
+This must not inject meaning. The system is allowed to learn that pattern A and pattern B repeatedly occurred together; it is not allowed to predeclare that A is an object, B is a word, or that either carries a finished semantic interpretation.
+
+The phi-memory experiment is defined in `docs/PHI_MEMORY_LEARNING.md`. Golden-ratio-derived memory dynamics must be compared against a control under identical experience rather than assumed to be superior.
+
+Only after this learning gate passes should Frank move to symbol grounding and first-word experiments.

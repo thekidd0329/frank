@@ -17,6 +17,15 @@ object GoldenRatioExperiment {
     }
 
     /**
+     * Returns phi^-power. This is the canonical source for experiments that
+     * compare phi-derived scales against ordinary control constants.
+     */
+    fun inversePower(power: Int): Double {
+        require(power >= 0) { "power must be non-negative" }
+        return Math.pow(PHI, -power.toDouble())
+    }
+
+    /**
      * Produces [count] positive geometric weights whose adjacent ratio is PHI.
      * The result is normalized and contains no cognitive interpretation.
      */
