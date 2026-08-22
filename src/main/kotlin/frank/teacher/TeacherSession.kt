@@ -2,6 +2,8 @@ package frank.teacher
 
 import frank.cognition.CommitmentFlags
 import frank.cognition.DevelopmentalSignal
+import frank.cognition.EpistemicGap
+import frank.cognition.EpistemicGapDetector
 import frank.cognition.Locus
 import frank.cognition.NewbornLearningLoop
 import frank.cognition.NewbornState
@@ -13,6 +15,15 @@ import frank.cognition.TemporalAnchor
 import java.nio.charset.StandardCharsets
 import kotlin.math.abs
 import kotlin.math.ceil
+
+/**
+ * Pre-language question chosen by Frank's own unresolved cognitive field.
+ * sourcePreview is developer/teacher UI context only; it is not the question source.
+ */
+data class LearningQuestionIntent(
+    val gap: EpistemicGap,
+    val sourcePreview: String?
+)
 
 class TeacherSession(
     private val journal: TeachingJournal = TeachingJournal(TeachingJournal.defaultPath())
@@ -84,6 +95,27 @@ class TeacherSession(
 
     fun wantsWake(): Boolean = brain.wantsWake()
 
+    /**
+     * Frank's own ranked learning gaps. Subjects come only from experiences that
+     * exist in his journal; the programmer does not supply a question list.
+     */
+    fun learningGaps(limit: Int = 8): List<LearningQuestionIntent> {
+        val experiences = journal.events().filterIsInstance<TeachingEvent.Experience>()
+        val observed = experiences.map { Locus(loop.locusFor(it.raw)) }
+        val previewByLocus = linkedMapOf<Locus, String?>()
+        experiences.forEach { event ->
+            val locus = Locus(loop.locusFor(event.raw))
+            previewByLocus[locus] = developerPreview(event.raw)
+        }
+
+        return EpistemicGapDetector
+            .rank(observed, brain.commitmentSnapshot(), limit)
+            .map { gap -> LearningQuestionIntent(gap, previewByLocus[gap.locus]) }
+    }
+
+    /** Choose the single strongest information need from Frank's current field. */
+    fun nextQuestionIntent(): LearningQuestionIntent? = learningGaps(limit = 1).firstOrNull()
+
     fun eventCount(): Int = journal.eventCount()
 
     private fun applyPending(signal: DevelopmentalSignal): Long {
@@ -131,5 +163,12 @@ class TeacherSession(
         repeat(steps) {
             if (brain.isAsleep()) brain.tick(cognitiveLoad = 0f)
         }
+    }
+
+    private fun developerPreview(raw: ByteArray): String? {
+        val text = raw.toString(StandardCharsets.UTF_8).trim()
+        if (text.isEmpty()) return null
+        if (text.any { it.code < 0x20 && it != '\n' && it != '\r' && it != '\t' }) return null
+        return text.replace("\n", " ").take(120)
     }
 }
