@@ -19,9 +19,18 @@ class NewbornLearningLoop(
     val residualField: Map<Long, Float>
         get() = residuals.toMap()
 
-    fun observe(raw: ByteArray, signal: DevelopmentalSignal): Long {
+    /**
+     * Stable cognitive address for a raw observation.
+     * Exposed so the teaching surface and the Residual Commitment Field can
+     * refer to the same experience without inventing a second addressing rule.
+     */
+    fun locusFor(raw: ByteArray): Long {
         require(raw.isNotEmpty()) { "newborn observations cannot be empty" }
-        val locus = stableLocus(raw)
+        return stableLocus(raw)
+    }
+
+    fun observe(raw: ByteArray, signal: DevelopmentalSignal): Long {
+        val locus = locusFor(raw)
         val signedEvidence = signal.reward - signal.threat
         val current = residuals[locus] ?: 0f
         val next = (current + signedEvidence).coerceIn(-1f, 1f)

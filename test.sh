@@ -19,6 +19,7 @@ java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NewbornLear
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.HomeostaticTensionTests
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NewbornDynamicsTests
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.teacher.TeacherSessionTests
+java -cp build/frank-tests.jar:build/frank-bones.jar frank.teacher.LearningQuestionProjectorTests
 
 if [[ -d prototype/python ]]; then
   (cd prototype/python && python -m pytest -q)
