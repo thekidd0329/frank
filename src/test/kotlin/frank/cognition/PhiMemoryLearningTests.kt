@@ -37,7 +37,7 @@ object PhiMemoryLearningTests {
     private fun passiveAgingCannotInvertResidualPolarity() {
         val loop = NewbornLearningLoop(memoryProfile = MemoryDynamicsProfile.PHI)
         val raw = "safe-pattern".encodeToByteArray()
-        val locus = loop.observe(raw, DevelopmentalSignal(reward = 1f))
+        val locus = loop.observe(raw, DevelopmentalSignal(novelty = 1f, reward = 1f))
         repeat(4) {
             loop.ageMemory()
             val value = loop.residualField[locus]
