@@ -7,6 +7,7 @@ object TeacherSessionTests {
     @JvmStatic
     fun main(args: Array<String>) {
         teachingReconstructsIntoDevelopmentalBrain()
+        selfQuestionComesFromOwnUnresolvedExperience()
         teachingLoadHonorsEndogenousSleep()
         println("TeacherSessionTests PASS")
     }
@@ -58,6 +59,44 @@ object TeacherSessionTests {
         Files.deleteIfExists(dir)
     }
 
+    private fun selfQuestionComesFromOwnUnresolvedExperience() {
+        val dir = Files.createTempDirectory("frank-teacher-question-test")
+        val path = dir.resolve("teaching.log")
+        val session = TeacherSession(TeachingJournal(path))
+
+        session.stage("warm hand")
+        val knownLocus = session.reinforce(0.90f)
+
+        session.stage("flickering shape")
+        val unresolvedLocus = session.commit()
+
+        val gaps = session.learningGaps()
+        check(gaps.isNotEmpty())
+        check(gaps.first().gap.locus.raw == unresolvedLocus) {
+            "the most unresolved actually observed experience should rank first"
+        }
+        check(gaps.first().gap.pressure > gaps.firstOrNull { it.gap.locus.raw == knownLocus }!!.gap.pressure)
+
+        val question = requireNotNull(session.nextQuestionIntent())
+        check(question.gap.locus.raw == unresolvedLocus) {
+            "Frank must choose the question subject from his own unresolved field"
+        }
+        check(question.sourcePreview == "flickering shape") {
+            "preview may expose the originating experience to the teacher UI"
+        }
+
+        val reconstructed = TeacherSession(TeachingJournal(path))
+        check(reconstructed.learningGaps() == gaps) {
+            "learning gaps must reconstruct from persisted experience and cognitive state"
+        }
+        check(reconstructed.nextQuestionIntent() == question) {
+            "Frank's next question intent must survive restart without a scripted question list"
+        }
+
+        Files.deleteIfExists(path)
+        Files.deleteIfExists(dir)
+    }
+
     private fun teachingLoadHonorsEndogenousSleep() {
         val dir = Files.createTempDirectory("frank-teacher-sleep-test")
         val path = dir.resolve("teaching.log")
@@ -72,6 +111,9 @@ object TeacherSessionTests {
 
         check(session.isAsleep()) { "teaching load should eventually trigger endogenous sleep" }
         check(!session.wantsWake()) { "Frank must not want to wake while homeostatic recovery is incomplete" }
+        check(session.nextQuestionIntent() == null) {
+            "Frank must not emit a waking question while he knows he is asleep"
+        }
 
         session.stage("experience presented while asleep")
         val blocked = runCatching { session.commit() }.isFailure
@@ -81,6 +123,9 @@ object TeacherSessionTests {
         session.recover(1.0f)
         check(!session.isAsleep()) { "recovery harness should advance sleep until the internal wake threshold is reached" }
         check(session.wantsWake()) { "once rested, the internal state should permit wake" }
+        check(session.nextQuestionIntent() != null) {
+            "once awake, unresolved observed experience may again produce a question intent"
+        }
 
         // The previously staged experience can now be learned without restaging it.
         session.reinforce(0.60f)
