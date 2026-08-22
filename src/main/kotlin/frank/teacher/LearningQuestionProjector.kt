@@ -20,7 +20,7 @@ class LearningQuestionProjector(
         val context = session.brainSnapshot()
             .sortedByDescending { it.residualForce }
             .take(32)
-            .map(ModelContextAtom::from)
+            .map { commitment -> ModelContextAtom.from(commitment) }
 
         val text = model.verbalizeQuestion(
             QuestionProjectionRequest(
