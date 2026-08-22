@@ -30,16 +30,19 @@ class NewbornLearningLoop(
         get() = residuals.toMap()
 
     /**
-     * Integrate one observation for a specified amount of simulated neural time.
+     * Integrate one observation for an explicit amount of simulated neural time.
      *
      * durationSeconds says how long the experience exists in the simulated brain.
      * integrationStepSeconds controls numerical resolution only. Changing the step
      * size while preserving duration should not materially change the result.
+     *
+     * There is intentionally no default duration: callers must state how much
+     * developmental time the observation represents.
      */
     fun observe(
         raw: ByteArray,
         signal: DevelopmentalSignal,
-        durationSeconds: Float = NeuralTime.DEFAULT_TICK_SECONDS,
+        durationSeconds: Float,
         integrationStepSeconds: Float = NeuralTime.DEFAULT_TICK_SECONDS
     ): Long {
         require(raw.isNotEmpty()) { "newborn observations cannot be empty" }
