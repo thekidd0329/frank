@@ -52,7 +52,7 @@ object NewbornLearningLoopTests {
     private fun passiveAgingWeakensWithoutInversion() {
         val loop = NewbornLearningLoop(memoryProfile = MemoryDynamicsProfile.PHI)
         val raw = "positive".encodeToByteArray()
-        val locus = loop.observe(raw, DevelopmentalSignal(reward = 1f))
+        val locus = loop.observe(raw, DevelopmentalSignal(novelty = 1f, reward = 1f))
         val before = loop.residualField.getValue(locus)
         loop.ageMemory()
         val after = loop.residualField.getValue(locus)
