@@ -11,22 +11,28 @@ import java.util.Base64
 /**
  * Append-only teaching journal for newborn Frank.
  *
- * The journal stores the actual developmental inputs and recovery events, then
- * reconstructs state by replaying them. It deliberately avoids persisting a
- * separate hand-authored semantic model.
+ * The journal stores actual developmental inputs and recovery events. All
+ * rebuildable teaching/cognitive surfaces must derive from these events rather
+ * than from a second hand-authored semantic database.
  */
 class TeachingJournal(private val path: Path) {
-    fun replayInto(loop: NewbornLearningLoop) {
-        if (!Files.exists(path)) return
-        Files.readAllLines(path, StandardCharsets.UTF_8)
+    /** Decode the complete developmental history in journal order. */
+    fun events(): List<TeachingEvent> {
+        if (!Files.exists(path)) return emptyList()
+        return Files.readAllLines(path, StandardCharsets.UTF_8)
             .filter { it.isNotBlank() }
-            .forEachIndexed { index, line ->
-                when (val event = decode(line)) {
-                    is TeachingEvent.Experience -> loop.observe(event.raw, event.signal)
-                    is TeachingEvent.Recovery -> loop.recover(event.amount)
-                    null -> error("invalid teaching journal entry at line ${index + 1}")
-                }
+            .mapIndexed { index, line ->
+                decode(line) ?: error("invalid teaching journal entry at line ${index + 1}")
             }
+    }
+
+    fun replayInto(loop: NewbornLearningLoop) {
+        events().forEach { event ->
+            when (event) {
+                is TeachingEvent.Experience -> loop.observe(event.raw, event.signal)
+                is TeachingEvent.Recovery -> loop.recover(event.amount)
+            }
+        }
     }
 
     fun appendExperience(raw: ByteArray, signal: DevelopmentalSignal) {
@@ -39,10 +45,7 @@ class TeachingJournal(private val path: Path) {
         append(encode(TeachingEvent.Recovery(amount)))
     }
 
-    fun eventCount(): Int {
-        if (!Files.exists(path)) return 0
-        return Files.readAllLines(path, StandardCharsets.UTF_8).count { it.isNotBlank() }
-    }
+    fun eventCount(): Int = events().size
 
     private fun append(line: String) {
         path.parent?.let { Files.createDirectories(it) }
