@@ -113,8 +113,9 @@ class TeacherSession(
             .map { gap -> LearningQuestionIntent(gap, previewByLocus[gap.locus]) }
     }
 
-    /** Choose the single strongest information need from Frank's current field. */
-    fun nextQuestionIntent(): LearningQuestionIntent? = learningGaps(limit = 1).firstOrNull()
+    /** Choose the single strongest waking information need from Frank's current field. */
+    fun nextQuestionIntent(): LearningQuestionIntent? =
+        if (brain.isAsleep()) null else learningGaps(limit = 1).firstOrNull()
 
     fun eventCount(): Int = journal.eventCount()
 
