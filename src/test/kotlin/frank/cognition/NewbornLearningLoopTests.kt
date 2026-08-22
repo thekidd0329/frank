@@ -7,6 +7,8 @@ object NewbornLearningLoopTests {
         contradictionLeavesSignedResidual()
         cancellationPrunesTheLocus()
         stateAndFieldMoveTogether()
+        passiveAgingWeakensWithoutInversion()
+        pairedExperienceBecomesRetrievable()
         println("NewbornLearningLoopTests: PASS")
     }
 
@@ -45,5 +47,24 @@ object NewbornLearningLoopTests {
         check(loop.residualField.isNotEmpty())
         val rebuilt = loop.reconstructState()
         check(rebuilt == loop.state)
+    }
+
+    private fun passiveAgingWeakensWithoutInversion() {
+        val loop = NewbornLearningLoop(memoryProfile = MemoryDynamicsProfile.PHI)
+        val raw = "positive".encodeToByteArray()
+        val locus = loop.observe(raw, DevelopmentalSignal(reward = 1f))
+        val before = loop.residualField.getValue(locus)
+        loop.ageMemory()
+        val after = loop.residualField.getValue(locus)
+        check(after > 0f && after < before)
+    }
+
+    private fun pairedExperienceBecomesRetrievable() {
+        val loop = NewbornLearningLoop(memoryProfile = MemoryDynamicsProfile.PHI)
+        val first = "shape-a".encodeToByteArray()
+        val second = "sound-a".encodeToByteArray()
+        repeat(4) { loop.associate(first, second) }
+        val expected = loop.locusOf(second)
+        check(loop.recall(first).any { it.locus == expected })
     }
 }
