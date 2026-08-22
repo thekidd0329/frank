@@ -18,6 +18,7 @@ java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NewbornStat
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NewbornLearningLoopTests
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.HomeostaticTensionTests
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NewbornDynamicsTests
+java -cp build/frank-tests.jar:build/frank-bones.jar frank.cognition.NeuralTimeTests
 java -cp build/frank-tests.jar:build/frank-bones.jar frank.teacher.TeacherSessionTests
 
 if [[ -d prototype/python ]]; then
