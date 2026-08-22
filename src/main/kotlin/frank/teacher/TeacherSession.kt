@@ -6,12 +6,18 @@ import frank.cognition.NewbornState
 import java.nio.charset.StandardCharsets
 
 class TeacherSession(
-    private val journal: TeachingJournal = TeachingJournal(TeachingJournal.defaultPath())
+    private val journal: TeachingJournal = TeachingJournal(TeachingJournal.defaultPath()),
+    /**
+     * Temporary terminal-level exposure assumption until a sensor layer supplies
+     * measured stimulus duration. The duration is persisted with each event.
+     */
+    private val teachingExposureSeconds: Float = 1.0f
 ) {
     private val loop = NewbornLearningLoop()
     private var pending: ByteArray? = null
 
     init {
+        require(teachingExposureSeconds > 0f)
         journal.replayInto(loop)
     }
 
@@ -48,8 +54,12 @@ class TeacherSession(
 
     private fun applyPending(signal: DevelopmentalSignal): Long {
         val raw = pending ?: error("no staged observation; use /observe first")
-        val locus = loop.observe(raw, signal)
-        journal.appendExperience(raw, signal)
+        val locus = loop.observe(
+            raw,
+            signal,
+            durationSeconds = teachingExposureSeconds
+        )
+        journal.appendExperience(raw, signal, durationSeconds = teachingExposureSeconds)
         pending = null
         return locus
     }

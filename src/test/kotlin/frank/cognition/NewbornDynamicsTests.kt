@@ -1,11 +1,13 @@
 package frank.cognition
 
+import kotlin.math.abs
+
 object NewbornDynamicsTests {
     @JvmStatic
     fun main(args: Array<String>) {
         learningProgressCanReduceEpistemicTension()
         loadAccumulatesAwakeAndReducesDuringSleep()
-        contingencySeparatesPredictedFromUnpredictedChange()
+        contingencySeparatesPredictedFromUnpredictedChangeOverTime()
         newbornStartsUndifferentiated()
         println("NewbornDynamicsTests: PASS")
     }
@@ -20,26 +22,53 @@ object NewbornDynamicsTests {
             fastError = 0.1f,
             slowError = 0.5f
         )
-        val after = improving.update(predictionError = 0.1f, uncertainty = 0.2f)
+        val after = improving.update(
+            predictionError = 0.1f,
+            uncertainty = 0.2f,
+            dt = NeuralTime.DEFAULT_TICK_SECONDS
+        )
         check(after.fastError < after.slowError)
         check(after.value < improving.value)
     }
 
     private fun loadAccumulatesAwakeAndReducesDuringSleep() {
-        val awake = ConsolidationLoad().update(0.8f, 0.4f, 0.6f, sleepGate = 0f)
-        val sleeping = awake.update(0f, 0f, 0f, sleepGate = 1f)
+        val awake = ConsolidationLoad().update(
+            predictionError = 0.8f,
+            residualConflict = 0.4f,
+            onlineLearningMagnitude = 0.6f,
+            sleepGate = 0f,
+            dt = 1f
+        )
+        val sleeping = awake.update(
+            predictionError = 0f,
+            residualConflict = 0f,
+            onlineLearningMagnitude = 0f,
+            sleepGate = 1f,
+            dt = 1f
+        )
         check(awake.value > 0f)
         check(sleeping.value < awake.value)
     }
 
-    private fun contingencySeparatesPredictedFromUnpredictedChange() {
+    private fun contingencySeparatesPredictedFromUnpredictedChangeOverTime() {
         var learned = ContingencyState()
-        repeat(5) {
-            learned = learned.update(predictedChange = 1f, actualChange = 1f)
+        repeat(5_000) {
+            learned = learned.update(
+                predictedChange = 1f,
+                actualChange = 1f,
+                dt = NeuralTime.DEFAULT_TICK_SECONDS
+            )
         }
-        val mismatch = learned.update(predictedChange = 1f, actualChange = -1f)
-        check(learned.omega > 0.5f)
-        check(mismatch.omega < learned.omega)
+        val beforeMismatch = learned.omega
+        repeat(1_000) {
+            learned = learned.update(
+                predictedChange = 1f,
+                actualChange = -1f,
+                dt = NeuralTime.DEFAULT_TICK_SECONDS
+            )
+        }
+        check(beforeMismatch > 0.5f)
+        check(learned.omega < beforeMismatch)
     }
 
     private fun newbornStartsUndifferentiated() {
@@ -49,5 +78,6 @@ object NewbornDynamicsTests {
         check(newborn.e.value == 0f)
         check(newborn.contingency.omega == 0f)
         check(newborn.load.value == 0f)
+        check(abs(newborn.neuralAgeSeconds) < 1e-12)
     }
 }

@@ -7,7 +7,10 @@ package frank.cognition
  * personality, vocabulary, relationship map, or moral ontology.
  */
 data class NewbornState(
+    /** Integration-step count only. Never use this as developmental age. */
     val ageTicks: Long = 0L,
+    /** Canonical developmental age in simulated neural seconds. */
+    val neuralAgeSeconds: Double = 0.0,
     val wakePressure: Float = 0.0f,
     val unmetNeedPressure: Float = 0.0f,
     val noveltyPressure: Float = 0.0f,
@@ -15,23 +18,36 @@ data class NewbornState(
     val affect: MockAffect = MockAffect.neutral(),
     val learnedSignals: Int = 0
 ) {
-    fun experience(signal: DevelopmentalSignal): NewbornState {
-        val nextWake = (wakePressure + signal.processingCost).coerceIn(0f, 1f)
-        val nextNeed = (unmetNeedPressure + signal.unresolvedPressure - signal.resolvedPressure)
-            .coerceIn(0f, 1f)
-        val nextNovelty = (noveltyPressure + signal.novelty - signal.familiarity)
-            .coerceIn(0f, 1f)
+    fun experience(
+        signal: DevelopmentalSignal,
+        dt: Float = NeuralTime.DEFAULT_TICK_SECONDS
+    ): NewbornState {
+        NeuralTime.requireDuration(dt)
+        val nextWake = (wakePressure + signal.processingCost * dt).coerceIn(0f, 1f)
+        val nextNeed = (
+            unmetNeedPressure +
+                (signal.unresolvedPressure - signal.resolvedPressure) * dt
+            ).coerceIn(0f, 1f)
+        val nextNovelty = (
+            noveltyPressure +
+                (signal.novelty - signal.familiarity) * dt
+            ).coerceIn(0f, 1f)
         return copy(
             ageTicks = ageTicks + 1,
+            neuralAgeSeconds = neuralAgeSeconds + dt,
             wakePressure = nextWake,
             unmetNeedPressure = nextNeed,
             noveltyPressure = nextNovelty,
-            homeostaticTension = homeostaticTension.step(signal),
-            affect = affect.integrate(signal),
+            homeostaticTension = homeostaticTension.step(signal, dt = dt),
+            affect = affect.integrate(signal, dt = dt),
             learnedSignals = learnedSignals + 1
         )
     }
 
+    /**
+     * Explicit recovery intervention retained for the teaching terminal.
+     * This is not the sleep/neural-time path; endogenous sleep uses NewbornDynamics.
+     */
     fun recover(amount: Float): NewbornState {
         require(amount in 0f..1f)
         val signal = DevelopmentalSignal(
@@ -61,8 +77,11 @@ data class HomeostaticTension(
         require(equilibrium >= 0f)
     }
 
-    fun step(signal: DevelopmentalSignal, dt: Float = 1f): HomeostaticTension {
-        require(dt >= 0f)
+    fun step(
+        signal: DevelopmentalSignal,
+        dt: Float = NeuralTime.DEFAULT_TICK_SECONDS
+    ): HomeostaticTension {
+        NeuralTime.requireDuration(dt)
         val internal = signal.internalError
         val externalExcess = (signal.externalPredictionError * signal.externalPredictionError - signal.externalThreshold)
             .coerceAtLeast(0f)
@@ -122,15 +141,24 @@ data class MockAffect(
         listOf(valence, arousal, safety, curiosity).forEach { require(it in -1f..1f) }
     }
 
-    fun integrate(signal: DevelopmentalSignal): MockAffect =
-        copy(
-            valence = (valence + signal.reward * 0.35f - signal.threat * 0.45f).coerceIn(-1f, 1f),
-            arousal = (arousal + signal.novelty * 0.25f + signal.threat * 0.35f - signal.familiarity * 0.10f)
+    fun integrate(
+        signal: DevelopmentalSignal,
+        dt: Float = NeuralTime.DEFAULT_TICK_SECONDS
+    ): MockAffect {
+        NeuralTime.requireDuration(dt)
+        return copy(
+            valence = (valence + (signal.reward * 0.35f - signal.threat * 0.45f) * dt)
                 .coerceIn(-1f, 1f),
-            safety = (safety + signal.reward * 0.25f - signal.threat * 0.50f).coerceIn(-1f, 1f),
-            curiosity = (curiosity + signal.novelty * 0.30f - signal.familiarity * 0.12f)
+            arousal = (
+                arousal +
+                    (signal.novelty * 0.25f + signal.threat * 0.35f - signal.familiarity * 0.10f) * dt
+                ).coerceIn(-1f, 1f),
+            safety = (safety + (signal.reward * 0.25f - signal.threat * 0.50f) * dt)
+                .coerceIn(-1f, 1f),
+            curiosity = (curiosity + (signal.novelty * 0.30f - signal.familiarity * 0.12f) * dt)
                 .coerceIn(-1f, 1f)
         )
+    }
 
     fun recover(amount: Float): MockAffect =
         copy(

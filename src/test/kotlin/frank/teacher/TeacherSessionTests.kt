@@ -1,6 +1,7 @@
 package frank.teacher
 
 import java.nio.file.Files
+import kotlin.math.abs
 
 object TeacherSessionTests {
     @JvmStatic
@@ -15,8 +16,8 @@ object TeacherSessionTests {
         val negativeLocus = first.contradict(0.50f)
         first.recover(0.25f)
 
-        check(first.residualField()[positiveLocus] == 0.75f)
-        check(first.residualField()[negativeLocus] == -0.50f)
+        check(abs(first.residualField().getValue(positiveLocus) - 0.75f) < 0.002f)
+        check(abs(first.residualField().getValue(negativeLocus) + 0.50f) < 0.002f)
         check(first.eventCount() == 3)
 
         val expectedField = first.residualField()
