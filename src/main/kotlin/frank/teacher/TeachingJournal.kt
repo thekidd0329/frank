@@ -11,9 +11,9 @@ import java.util.Base64
 /**
  * Append-only teaching journal for newborn Frank.
  *
- * The journal stores the actual developmental inputs and recovery events, then
- * reconstructs state by replaying them. It deliberately avoids persisting a
- * separate hand-authored semantic model.
+ * The journal stores developmental inputs, learned pairings, passive memory
+ * aging, and recovery events, then reconstructs state by replaying them. It
+ * deliberately avoids persisting a separate hand-authored semantic model.
  */
 class TeachingJournal(private val path: Path) {
     fun replayInto(loop: NewbornLearningLoop) {
@@ -24,6 +24,8 @@ class TeachingJournal(private val path: Path) {
                 when (val event = decode(line)) {
                     is TeachingEvent.Experience -> loop.observe(event.raw, event.signal)
                     is TeachingEvent.Recovery -> loop.recover(event.amount)
+                    is TeachingEvent.Association -> loop.associate(event.first, event.second, event.salience)
+                    is TeachingEvent.MemoryAge -> loop.ageMemory(event.steps)
                     null -> error("invalid teaching journal entry at line ${index + 1}")
                 }
             }
@@ -37,6 +39,17 @@ class TeachingJournal(private val path: Path) {
     fun appendRecovery(amount: Float) {
         require(amount in 0f..1f)
         append(encode(TeachingEvent.Recovery(amount)))
+    }
+
+    fun appendAssociation(first: ByteArray, second: ByteArray, salience: Float) {
+        require(first.isNotEmpty() && second.isNotEmpty())
+        require(salience in 0f..1f)
+        append(encode(TeachingEvent.Association(first.copyOf(), second.copyOf(), salience)))
+    }
+
+    fun appendMemoryAge(steps: Int) {
+        require(steps >= 0)
+        append(encode(TeachingEvent.MemoryAge(steps)))
     }
 
     fun eventCount(): Int {
@@ -57,6 +70,13 @@ class TeachingJournal(private val path: Path) {
 
     private fun encode(event: TeachingEvent): String = when (event) {
         is TeachingEvent.Recovery -> "R\t${event.amount}"
+        is TeachingEvent.MemoryAge -> "M\t${event.steps}"
+        is TeachingEvent.Association -> listOf(
+            "A",
+            Base64.getEncoder().encodeToString(event.first),
+            Base64.getEncoder().encodeToString(event.second),
+            event.salience
+        ).joinToString("\t")
         is TeachingEvent.Experience -> {
             val s = event.signal
             listOf(
@@ -86,8 +106,14 @@ class TeachingJournal(private val path: Path) {
     private fun decode(line: String): TeachingEvent? {
         val parts = line.split('\t')
         return when (parts.firstOrNull()) {
-            "R" -> if (parts.size == 2) {
-                TeachingEvent.Recovery(parts[1].toFloat())
+            "R" -> if (parts.size == 2) TeachingEvent.Recovery(parts[1].toFloat()) else null
+            "M" -> if (parts.size == 2) TeachingEvent.MemoryAge(parts[1].toInt()) else null
+            "A" -> if (parts.size == 4) {
+                TeachingEvent.Association(
+                    first = Base64.getDecoder().decode(parts[1]),
+                    second = Base64.getDecoder().decode(parts[2]),
+                    salience = parts[3].toFloat()
+                )
             } else null
             "E" -> if (parts.size == 19) {
                 TeachingEvent.Experience(
@@ -134,4 +160,6 @@ sealed class TeachingEvent {
     ) : TeachingEvent()
 
     data class Recovery(val amount: Float) : TeachingEvent()
+    data class Association(val first: ByteArray, val second: ByteArray, val salience: Float) : TeachingEvent()
+    data class MemoryAge(val steps: Int) : TeachingEvent()
 }
